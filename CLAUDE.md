@@ -44,6 +44,7 @@ Assets/_Project/
 - Never edit `.meta` files by hand. Never touch `Library/`, `Temp/`, `Logs/`.
 - Avoid hand-editing `.unity`, `.prefab`, `.asset` YAML; use editor scripts instead.
 - **Scene setup is done through an editor menu under the "Flowers" menu (e.g. "Flowers → Setup Scene").** Whenever you add a new component or serialized reference, update the setup menu so it wires it, and tell Utku explicitly to re-run the menu. (Lesson from Flappy Dog: missing wiring after code changes caused repeated UnassignedReference/NullReference errors.)
+- In setup menus, load assets by path *after* `EditorSceneManager.NewScene`/`OpenScene`. Opening a scene unloads unused assets, so asset references held from before become destroyed objects and get wired as "None" (happened with the Flower prefab).
 - Missing required references must fail once with a clear error in `Awake`, not spam errors every frame. Event unsubscription in `OnDisable` must be null-safe.
 - Do not add packages without asking.
 
