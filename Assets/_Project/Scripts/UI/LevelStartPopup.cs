@@ -31,7 +31,7 @@ namespace Flowers.UI
             closeButton.onClick.AddListener(() => _onClose?.Invoke());
         }
 
-        public void Show(int levelNumber, LevelDefinition level, Sprite[] flowerSprites, Sprite scoreIcon,
+        public void Show(int levelNumber, LevelDefinition level, GoalIcons icons,
             Action onPlay, Action onClose)
         {
             _onPlay = onPlay;
@@ -46,7 +46,7 @@ namespace Flowers.UI
             {
                 var item = Instantiate(goalTemplate, goalsContainer);
                 item.gameObject.SetActive(true);
-                var sprite = goal.Kind == GoalKind.Score ? scoreIcon : flowerSprites[goal.FlowerType];
+                var sprite = icons.For(goal);
                 item.Show(sprite, goal.Amount);
                 _items.Add(item);
             }

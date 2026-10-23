@@ -15,6 +15,15 @@ namespace Flowers.View
         [Tooltip("Plain square. Hides flowers outside the board while they fall in.")]
         [SerializeField] private Sprite maskSprite;
 
+        [Header("Obstacle sprites")]
+        [SerializeField] private Sprite potSprite;
+        [Tooltip("A 2-layer pot after its first hit.")]
+        [SerializeField] private Sprite potCrackedSprite;
+        [Tooltip("Drawn on top of a vine-wrapped flower.")]
+        [SerializeField] private Sprite vineSprite;
+        [Tooltip("Tile used under flowers on soil cells (not tinted).")]
+        [SerializeField] private Sprite soilTileSprite;
+
         [Header("Layout")]
         [SerializeField, Min(0.1f)] private float cellSize = 1f;
         [SerializeField, Range(0.3f, 1f)] private float flowerScale = 0.86f;
@@ -69,6 +78,10 @@ namespace Flowers.View
         public Sprite TileSprite => tileSprite;
         public Sprite FrameSprite => frameSprite;
         public Sprite MaskSprite => maskSprite;
+        public Sprite PotSprite => potSprite;
+        public Sprite PotCrackedSprite => potCrackedSprite;
+        public Sprite VineSprite => vineSprite;
+        public Sprite SoilTileSprite => soilTileSprite;
         public float CellSize => cellSize;
         public float FlowerScale => flowerScale;
         public float TileScale => tileScale;
@@ -100,6 +113,8 @@ namespace Flowers.View
             if (tileSprite == null) return "tile sprite is empty";
             if (frameSprite == null) return "frame sprite is empty";
             if (maskSprite == null) return "mask sprite is empty";
+            if (potSprite == null || potCrackedSprite == null || vineSprite == null || soilTileSprite == null)
+                return "an obstacle sprite (pot, cracked pot, vine, soil) is empty";
             return null;
         }
 
@@ -133,6 +148,14 @@ namespace Flowers.View
             boardShadowColor = DefaultShadow;
             lookVersion = LookVersion;
             return true;
+        }
+
+        public void EditorAssignObstacleSprites(Sprite pot, Sprite potCracked, Sprite vine, Sprite soilTile)
+        {
+            potSprite = pot;
+            potCrackedSprite = potCracked;
+            vineSprite = vine;
+            soilTileSprite = soilTile;
         }
 
         public void EditorAssignSprites(Sprite[] flowers, Sprite tile, Sprite frame, Sprite mask)

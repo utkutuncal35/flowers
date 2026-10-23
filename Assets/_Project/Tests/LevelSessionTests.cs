@@ -199,6 +199,75 @@ namespace Flowers.Board.Tests
             Assert.Throws<ArgumentException>(() => new LevelSession(Level(10, 3, 6)));
         }
 
+        private static readonly BoardLayout ObstacleLayout = BoardLayout.Parse(new[]
+        {
+            "..p..",
+            ".vPv.",
+            "sssss",
+        });
+
+        private static SwapResult ObstacleSwap(int potHitsBreaking, int potHitsCracking, int vines, int soil)
+        {
+            var hits = new List<PotHit>();
+            for (int i = 0; i < potHitsBreaking; i++) hits.Add(new PotHit(new Position(i, 0), 0));
+            for (int i = 0; i < potHitsCracking; i++) hits.Add(new PotHit(new Position(i, 1), 1));
+            var vineList = new List<Position>();
+            for (int i = 0; i < vines; i++) vineList.Add(new Position(i, 2));
+            var soilList = new List<Position>();
+            for (int i = 0; i < soil; i++) soilList.Add(new Position(i, 3));
+            var step = new CascadeStep(new Match[0], new ClearedFlower[0], new FlowerMove[0], new FlowerSpawn[0],
+                vineList, hits, soilList);
+            return SwapResult.Valid(new Position(0, 0), new Position(1, 0), new[] { step }, false, null, false);
+        }
+
+        [Test]
+        public void ObstacleGoals_WithAmountZero_MeanAllOnTheBoard()
+        {
+            var level = new LevelDefinition(ObstacleLayout, 5, 10, new[]
+            {
+                LevelGoal.Obstacle(GoalKind.BreakPots),
+                LevelGoal.Obstacle(GoalKind.FreeVines),
+                LevelGoal.Obstacle(GoalKind.ClearSoil, 3),
+            }, 3, 6);
+
+            Assert.That(level.Validate(), Is.Null);
+            Assert.That(level.Goals[0].Amount, Is.EqualTo(2));
+            Assert.That(level.Goals[1].Amount, Is.EqualTo(2));
+            Assert.That(level.Goals[2].Amount, Is.EqualTo(3), "explicit amount is kept");
+        }
+
+        [Test]
+        public void ObstacleGoals_MustMatchTheLayout()
+        {
+            var noPots = new LevelDefinition(7, 9, 5, 10, new[] { LevelGoal.Obstacle(GoalKind.BreakPots) }, 3, 6);
+            Assert.That(noPots.Validate(), Does.Contain("none"));
+
+            var tooMany = new LevelDefinition(ObstacleLayout, 5, 10, new[] { LevelGoal.Obstacle(GoalKind.FreeVines, 9) }, 3, 6);
+            Assert.That(tooMany.Validate(), Does.Contain("only 2"));
+        }
+
+        [Test]
+        public void ObstacleProgress_IsCounted_PotsOnlyWhenBroken()
+        {
+            var level = new LevelDefinition(ObstacleLayout, 5, 10, new[]
+            {
+                LevelGoal.Obstacle(GoalKind.BreakPots),
+                LevelGoal.Obstacle(GoalKind.FreeVines),
+                LevelGoal.Obstacle(GoalKind.ClearSoil),
+            }, 3, 6);
+            var session = new LevelSession(level);
+
+            session.ApplySwap(ObstacleSwap(potHitsBreaking: 1, potHitsCracking: 1, vines: 1, soil: 2));
+
+            Assert.That(session.Goals[0].Current, Is.EqualTo(1), "a cracked pot isn't broken yet");
+            Assert.That(session.Goals[1].Current, Is.EqualTo(1));
+            Assert.That(session.Goals[2].Current, Is.EqualTo(2));
+            Assert.That(session.Score, Is.EqualTo(5 * LevelSession.PointsPerObstacle));
+
+            session.ApplySwap(ObstacleSwap(potHitsBreaking: 1, potHitsCracking: 0, vines: 1, soil: 3));
+            Assert.That(session.State, Is.EqualTo(LevelState.Won));
+        }
+
         [Test]
         public void RealEngine_SessionStaysConsistent()
         {

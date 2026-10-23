@@ -8,7 +8,8 @@ namespace Flowers.Board
         private const int MaxAttempts = 200;
 
         /// <summary>
-        /// Rearranges the existing flowers so there are no matches and at least one valid move.
+        /// Rearranges the free flowers (not vine-wrapped) so there are no matches and at least one valid move.
+        /// Obstacles stay where they are.
         /// Returns where each flower went, so the view can animate it.
         /// In the rare case no good arrangement is found, the board is regenerated instead:
         /// <paramref name="regenerated"/> is true and the returned list is empty (the view should rebuild).
@@ -18,7 +19,7 @@ namespace Flowers.Board
             var positions = new List<Position>(board.Width * board.Height);
             for (int x = 0; x < board.Width; x++)
                 for (int y = 0; y < board.Height; y++)
-                    if (board[x, y] != BoardGrid.Empty)
+                    if (board[x, y] != BoardGrid.Empty && !board.IsFixed(new Position(x, y)))
                         positions.Add(new Position(x, y));
 
             var original = board.Clone();

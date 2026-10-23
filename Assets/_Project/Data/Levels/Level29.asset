@@ -10,16 +10,36 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 17f5bc207c7562849a49dedfed62d98e, type: 3}
-  m_Name: Level03_FewMoves
+  m_Name: Level29
   m_EditorClassIdentifier: Assembly-CSharp::Flowers.Levels.LevelData
+  layout: '.......
+
+    .......
+
+    sssssss
+
+    sssssss
+
+    ssPsPss
+
+    sssssss
+
+    sssssss
+
+    .......
+
+    .......'
   width: 7
   height: 9
   typeCount: 5
   seed: 0
-  moves: 8
+  moves: 23
   goals:
-  - Kind: 1
+  - Kind: 4
     FlowerType: 0
-    Amount: 700
-  twoStarMovesLeft: 2
-  threeStarMovesLeft: 4
+    Amount: 0
+  - Kind: 2
+    FlowerType: 0
+    Amount: 0
+  twoStarMovesLeft: 3
+  threeStarMovesLeft: 7

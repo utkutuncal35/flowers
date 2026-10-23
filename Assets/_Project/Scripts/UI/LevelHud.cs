@@ -16,8 +16,7 @@ namespace Flowers.UI
         [SerializeField] private Button mapButton;
 
         private readonly List<GoalItemView> _items = new List<GoalItemView>();
-        private Sprite[] _flowerSprites;
-        private Sprite _scoreIcon;
+        private GoalIcons _icons;
 
         public bool HasReferences =>
             levelText != null && movesText != null && goalsContainer != null && goalTemplate != null &&
@@ -25,10 +24,9 @@ namespace Flowers.UI
 
         public Button MapButton => mapButton;
 
-        public void Setup(int levelNumber, LevelSession session, Sprite[] flowerSprites, Sprite scoreIcon)
+        public void Setup(int levelNumber, LevelSession session, GoalIcons icons)
         {
-            _flowerSprites = flowerSprites;
-            _scoreIcon = scoreIcon;
+            _icons = icons;
             levelText.text = $"Bölüm {levelNumber}";
 
             foreach (var item in _items)
@@ -52,7 +50,7 @@ namespace Flowers.UI
             for (int i = 0; i < _items.Count; i++)
             {
                 var progress = session.Goals[i];
-                var sprite = progress.Goal.Kind == GoalKind.Score ? _scoreIcon : _flowerSprites[progress.Goal.FlowerType];
+                var sprite = _icons.For(progress.Goal);
                 _items[i].Show(sprite, progress.Remaining);
             }
         }

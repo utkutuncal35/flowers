@@ -18,11 +18,14 @@ namespace Flowers.Board
 
     public static class MoveFinder
     {
-        /// <summary>True if swapping a and b (adjacent, both non-empty, different types) would create a match.</summary>
+        /// <summary>
+        /// True if swapping a and b would create a match. Both must be adjacent, hold different flowers and be
+        /// swappable (not a pot, void or vine-wrapped cell).
+        /// </summary>
         public static bool IsValidSwap(BoardGrid board, Position a, Position b)
         {
             if (!board.IsInside(a) || !board.IsInside(b) || !a.IsAdjacentTo(b)) return false;
-            if (board[a] == BoardGrid.Empty || board[b] == BoardGrid.Empty) return false;
+            if (!board.CanSwap(a) || !board.CanSwap(b)) return false;
             if (board[a] == board[b]) return false;
 
             board.Swap(a, b);

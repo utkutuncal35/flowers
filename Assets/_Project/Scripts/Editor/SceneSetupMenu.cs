@@ -13,7 +13,7 @@ namespace Flowers.Editor
     /// <summary>
     /// Builds the game scene from scratch and wires every reference. Safe to run again at any time:
     /// whenever a new component or serialized field is added, it gets wired here.
-    /// Kept between runs: BoardViewConfig / JuiceConfig tuning, the level assets and the LevelList.
+    /// Kept between runs: BoardViewConfig / JuiceConfig tuning and the level assets (Flowers → Rebuild Levels rewrites those).
     /// The UI screens themselves are built by <see cref="UiScreensBuilder"/>.
     /// </summary>
     public static class SceneSetupMenu
@@ -21,8 +21,6 @@ namespace Flowers.Editor
         private const string ScenePath = "Assets/_Project/Scenes/Game.unity";
         private const string ConfigPath = "Assets/_Project/Data/BoardViewConfig.asset";
         private const string FlowerPrefabPath = "Assets/_Project/Prefabs/Flower.prefab";
-        private const string LevelsFolder = "Assets/_Project/Data/Levels";
-        private const string LevelListPath = "Assets/_Project/Data/LevelList.asset";
         private const string JuiceConfigPath = "Assets/_Project/Data/JuiceConfig.asset";
         private const string ParticleMaterialPath = "Assets/_Project/Art/Materials/Petals.mat";
         private const string UnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
@@ -38,7 +36,7 @@ namespace Flowers.Editor
             var art = GameArt.GenerateAll();
             CreateOrUpdateConfig(art);
             CreateFlowerPrefab(art.Flowers[0]);
-            CreateSampleLevelsIfMissing();
+            LevelBuilder.Build(overwriteExisting: false); // creates missing catalog levels only
             CreateOrUpdateJuiceConfig(PlaceholderAudio.GenerateAll());
             CreateOrUpdateParticleMaterial(art.Petal);
             AssetDatabase.SaveAssets();
@@ -102,6 +100,7 @@ namespace Flowers.Editor
             if (config.EditorUpgradeLook())
                 Debug.Log("[Flowers] BoardViewConfig colors updated to the new look.");
             config.EditorAssignSprites(art.Flowers, art.Tile, art.Frame, art.Mask);
+            config.EditorAssignObstacleSprites(art.Pot, art.PotCracked, art.Vine, art.Soil);
             EditorUtility.SetDirty(config);
         }
 
@@ -120,51 +119,6 @@ namespace Flowers.Editor
             Object.DestroyImmediate(go);
         }
 
-        /// <summary>
-        /// Sample levels, tuned by simulating 300 games each with the real board engine
-        /// (win rate random player / goal-focused player):
-        /// 1: ~99% / 100%, 2: ~73% / 96%, 3: ~65% / 79%.
-        /// Existing level assets are never overwritten, so edits made in the Inspector stay.
-        /// </summary>
-        private static void CreateSampleLevelsIfMissing()
-        {
-            EditorFolders.Ensure(LevelsFolder);
-
-            var levels = new[]
-            {
-                // Tutorial: 4 flower types (lots of matches), plenty of moves, one goal.
-                CreateLevelIfMissing("Level01_Tutorial", 7, 8, 4, 15,
-                    new[] { LevelGoal.Collect(2, 10) }, twoStars: 6, threeStars: 10),
-                // Medium: two goals at once.
-                CreateLevelIfMissing("Level02_TwoFlowers", 7, 9, 5, 16,
-                    new[] { LevelGoal.Collect(0, 15), LevelGoal.Collect(1, 15) }, twoStars: 4, threeStars: 7),
-                // One goal, very few moves: chains matter.
-                CreateLevelIfMissing("Level03_FewMoves", 7, 9, 5, 8,
-                    new[] { LevelGoal.ReachScore(700) }, twoStars: 2, threeStars: 4),
-            };
-
-            var list = AssetDatabase.LoadAssetAtPath<LevelList>(LevelListPath);
-            if (list == null)
-            {
-                list = ScriptableObject.CreateInstance<LevelList>();
-                list.EditorSetLevels(levels);
-                AssetDatabase.CreateAsset(list, LevelListPath);
-            }
-        }
-
-        private static LevelData CreateLevelIfMissing(string assetName, int width, int height, int types, int moves,
-            LevelGoal[] goals, int twoStars, int threeStars)
-        {
-            string path = $"{LevelsFolder}/{assetName}.asset";
-            var level = AssetDatabase.LoadAssetAtPath<LevelData>(path);
-            if (level != null) return level;
-
-            level = ScriptableObject.CreateInstance<LevelData>();
-            level.EditorSetup(width, height, types, moves, goals, twoStars, threeStars);
-            AssetDatabase.CreateAsset(level, path);
-            return level;
-        }
-
         // ---------- Scene ----------
 
         private static void BuildScene()
@@ -177,7 +131,7 @@ namespace Flowers.Editor
             var config = AssetDatabase.LoadAssetAtPath<BoardViewConfig>(ConfigPath);
             var prefabObject = AssetDatabase.LoadAssetAtPath<GameObject>(FlowerPrefabPath);
             var flowerPrefab = prefabObject != null ? prefabObject.GetComponent<FlowerView>() : null;
-            var levelList = AssetDatabase.LoadAssetAtPath<LevelList>(LevelListPath);
+            var levelList = AssetDatabase.LoadAssetAtPath<LevelList>(LevelBuilder.LevelListPath);
             var juiceConfig = AssetDatabase.LoadAssetAtPath<JuiceConfig>(JuiceConfigPath);
             var particleMaterial = AssetDatabase.LoadAssetAtPath<Material>(ParticleMaterialPath);
             var sprites = LoadUiSprites(config);

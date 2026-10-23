@@ -31,6 +31,7 @@ namespace Flowers.Levels
     public sealed class LevelSession
     {
         public const int PointsPerFlower = 10;
+        public const int PointsPerObstacle = 20;
 
         private readonly List<GoalProgress> _goals = new List<GoalProgress>();
 
@@ -65,13 +66,22 @@ namespace Flowers.Levels
             // Chain reactions are worth more: step 0 x1, step 1 x2, ...
             for (int step = 0; step < result.Steps.Count; step++)
             {
-                var cleared = result.Steps[step].Cleared;
+                var s = result.Steps[step];
                 int multiplier = step + 1;
-                for (int i = 0; i < cleared.Count; i++)
+                for (int i = 0; i < s.Cleared.Count; i++)
                 {
                     Score += PointsPerFlower * multiplier;
-                    CountCollected(cleared[i].Type);
+                    CountCollected(s.Cleared[i].Type);
                 }
+
+                int brokenPots = 0;
+                for (int i = 0; i < s.PotHits.Count; i++)
+                    if (s.PotHits[i].LayersLeft == 0) brokenPots++;
+
+                CountObstacles(GoalKind.BreakPots, brokenPots);
+                CountObstacles(GoalKind.FreeVines, s.VinesFreed.Count);
+                CountObstacles(GoalKind.ClearSoil, s.SoilCleared.Count);
+                Score += PointsPerObstacle * multiplier * (s.PotHits.Count + s.VinesFreed.Count + s.SoilCleared.Count);
             }
 
             foreach (var goal in _goals)
@@ -80,6 +90,14 @@ namespace Flowers.Levels
 
             UpdateState();
             return true;
+        }
+
+        private void CountObstacles(GoalKind kind, int count)
+        {
+            if (count == 0) return;
+            foreach (var goal in _goals)
+                if (goal.Goal.Kind == kind)
+                    goal.Current += count;
         }
 
         private void CountCollected(int flowerType)

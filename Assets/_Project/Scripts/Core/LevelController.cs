@@ -36,6 +36,7 @@ namespace Flowers.Core
 
         private readonly List<string> _levelIds = new List<string>();
         private LevelProgress _progress;
+        private GoalIcons _icons;
         private LevelSession _session;
         private int _levelIndex;
         private bool _ready;
@@ -62,6 +63,8 @@ namespace Flowers.Core
             loseScreen.MapButton.onClick.AddListener(ShowMap);
             hud.MapButton.onClick.AddListener(ShowMap);
             titleScreen.PlayButton.onClick.AddListener(ShowMap);
+            var config = boardView.Config;
+            _icons = new GoalIcons(config.FlowerSprites, scoreIcon, config.PotSprite, config.VineSprite, config.SoilTileSprite);
             _ready = true;
         }
 
@@ -110,7 +113,7 @@ namespace Flowers.Core
         {
             var data = levelList.Get(index);
             if (data == null) return;
-            levelStartPopup.Show(index + 1, data.ToDefinition(), boardView.Config.FlowerSprites, scoreIcon,
+            levelStartPopup.Show(index + 1, data.ToDefinition(), _icons,
                 () => StartLevel(index), levelStartPopup.Hide);
         }
 
@@ -150,6 +153,12 @@ namespace Flowers.Core
                 return;
             }
 
+            if (data.LayoutError != null)
+            {
+                Debug.LogError($"[Flowers] Level '{data.name}' has a broken layout: {data.LayoutError}.", data);
+                return;
+            }
+
             var definition = data.ToDefinition();
             string problem = definition.Validate();
             if (problem != null)
@@ -163,9 +172,9 @@ namespace Flowers.Core
 
             _levelIndex = index;
             _session = new LevelSession(definition);
-            boardView.Build(definition.Width, definition.Height, definition.TypeCount, data.Seed);
+            boardView.Build(definition.Layout, definition.TypeCount, data.Seed);
             boardView.InputEnabled = true;
-            hud.Setup(index + 1, _session, boardView.Config.FlowerSprites, scoreIcon);
+            hud.Setup(index + 1, _session, _icons);
         }
 
         private void OnSwapFinished(SwapResult result)

@@ -113,3 +113,7 @@ InitTestScene*.unity*
 
 # Screenshots from Flowers -> Capture Screens
 /Screenshots/
+
+# Level tuner build output
+/Tools/LevelTuner/bin/
+/Tools/LevelTuner/obj/

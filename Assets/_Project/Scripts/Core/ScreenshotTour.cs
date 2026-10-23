@@ -59,6 +59,20 @@ namespace Flowers.Core
             yield return new WaitForSecondsRealtime(1.2f);
             yield return Capture("6_lose");
 
+            // Obstacles and shaped boards.
+            controller.ShowMap();
+            controller.ShowLevelStart(29);
+            yield return new WaitForSecondsRealtime(0.8f);
+            yield return Capture("7_level30_popup");
+
+            controller.DebugStartLevel(25);
+            yield return new WaitForSecondsRealtime(3f);
+            yield return Capture("8_level26_game");
+
+            controller.DebugStartLevel(29);
+            yield return new WaitForSecondsRealtime(3f);
+            yield return Capture("9_level30_game");
+
             Debug.Log($"[Flowers] Screenshot tour done: {OutputFolder}");
             EditorApplication.isPlaying = false;
         }

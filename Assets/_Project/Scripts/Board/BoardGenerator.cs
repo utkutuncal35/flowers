@@ -6,17 +6,23 @@ namespace Flowers.Board
     {
         private const int MaxAttempts = 200;
 
-        /// <summary>A full board with no existing matches and at least one valid move.</summary>
-        public static BoardGrid Generate(int width, int height, int typeCount, Random random)
+        /// <summary>A full rectangular board with no existing matches and at least one valid move.</summary>
+        public static BoardGrid Generate(int width, int height, int typeCount, Random random) =>
+            Generate(BoardLayout.Rectangle(width, height), typeCount, random);
+
+        /// <summary>A board with the layout's shape and obstacles, no existing matches and at least one valid move.</summary>
+        public static BoardGrid Generate(BoardLayout layout, int typeCount, Random random)
         {
-            var board = new BoardGrid(width, height, typeCount);
+            var board = new BoardGrid(layout.Width, layout.Height, typeCount);
+            layout.ApplyTo(board);
             FillWithoutMatches(board, random);
             return board;
         }
 
         /// <summary>
-        /// Overwrites every cell. Picks each flower so it can't complete a run with the two flowers
-        /// to its left or the two below it, then retries until the board has a valid move.
+        /// Puts a flower in every cell that can hold one (obstacles stay as they are). Picks each flower so it
+        /// can't complete a run with the two flowers to its left or the two below it, then retries until the
+        /// board has a valid move.
         /// </summary>
         public static void FillWithoutMatches(BoardGrid board, Random random)
         {
@@ -28,6 +34,12 @@ namespace Flowers.Board
                 {
                     for (int y = 0; y < board.Height; y++)
                     {
+                        if (!board.CanHoldFlower(new Position(x, y)))
+                        {
+                            board[x, y] = BoardGrid.Empty;
+                            continue;
+                        }
+
                         int count = 0;
                         for (int type = 0; type < board.TypeCount; type++)
                             if (!WouldCompleteRun(board, x, y, type))

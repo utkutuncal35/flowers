@@ -35,6 +35,8 @@ namespace Flowers.Editor
         public const string RaysPath = UiFolder + "/Rays.png";
         public const string MarkerPath = UiFolder + "/MapMarker.png";
 
+        public const string ObstaclesFolder = "Assets/_Project/Art/Obstacles";
+
         private const int FlowerSize = 256;
         private const int TileSize = 128;
         private const int FrameSize = 128;
@@ -55,6 +57,10 @@ namespace Flowers.Editor
             public Sprite Frame;
             public Sprite Mask;
             public Sprite Petal;
+            public Sprite Pot;
+            public Sprite PotCracked;
+            public Sprite Vine;
+            public Sprite Soil;
         }
 
         public static Result GenerateAll()
@@ -93,6 +99,13 @@ namespace Flowers.Editor
             WriteSprite(RibbonPath, BackgroundArt.Ribbon(640, 200), 640, 200, UiPixelsPerUnit, new Vector4(120, 0, 120, 0));
             WriteSprite(RaysPath, BackgroundArt.Rays(512), 512, 512, UiPixelsPerUnit, Vector4.zero);
             WriteSprite(MarkerPath, BackgroundArt.MapMarker(128), 128, 128, UiPixelsPerUnit, Vector4.zero);
+
+            // Obstacles: 1 world unit wide, like the flowers.
+            EditorFolders.Ensure(ObstaclesFolder);
+            result.Pot = WriteSquare($"{ObstaclesFolder}/Pot.png", ObstacleArt.Pot(FlowerSize, false), FlowerSize, 0);
+            result.PotCracked = WriteSquare($"{ObstaclesFolder}/PotCracked.png", ObstacleArt.Pot(FlowerSize, true), FlowerSize, 0);
+            result.Vine = WriteSquare($"{ObstaclesFolder}/Vine.png", ObstacleArt.Vine(FlowerSize), FlowerSize, 0);
+            result.Soil = WriteSquare($"{ObstaclesFolder}/SoilTile.png", ObstacleArt.SoilTile(TileSize), TileSize, 0);
             return result;
         }
 

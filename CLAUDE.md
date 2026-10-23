@@ -36,6 +36,8 @@ Assets/_Project/
 - Board generation must never start with existing matches and must always have at least one valid move.
 - Input is locked while animations run.
 - Levels, tuning values, and personal messages live in ScriptableObjects or data files, not in code.
+  - Exception, on purpose: the 30 levels are *designed* in `Scripts/Editor/LevelCatalog.cs` (pure data, so the tuner can simulate them). The game reads only the LevelData assets, which `Flowers → Rebuild Levels` writes from the catalog plus `LevelTuning.cs`. Hand-made LevelData assets still work without code.
+  - Level workflow: edit `LevelCatalog` → run `Tools/LevelTuner` (`dotnet run -c Release -- ../../Assets/_Project/Scripts/Editor/LevelTuning.cs 500`) → `Flowers → Rebuild Levels`. Never hand-pick move counts; let the tuner set them from each level's target win rate.
 - Use `[SerializeField] private` fields, cache references in `Awake`, no allocations or `GetComponent` in `Update`.
 - Pool flower objects.
 - Keep it simple. No heavy frameworks or dependency injection.

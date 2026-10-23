@@ -21,6 +21,10 @@ MonoBehaviour:
   tileSprite: {fileID: 21300000, guid: 4f1970a391611a246a9dd08c0c9ce713, type: 3}
   frameSprite: {fileID: 21300000, guid: 2ee5145b30b299e4e8255b94f1403465, type: 3}
   maskSprite: {fileID: 21300000, guid: 6c2b1d0a35045f74396702e4e1326692, type: 3}
+  potSprite: {fileID: 21300000, guid: 943a361b18377f24190b8e0962845eda, type: 3}
+  potCrackedSprite: {fileID: 21300000, guid: e69da152947f30449b21baf34942ca88, type: 3}
+  vineSprite: {fileID: 21300000, guid: fb11c452d7ccac24a8d88200b586f36a, type: 3}
+  soilTileSprite: {fileID: 21300000, guid: ab716f2c0bd341e49b2a00c918c2e470, type: 3}
   cellSize: 1
   flowerScale: 0.86
   tileScale: 0.94

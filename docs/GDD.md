@@ -17,12 +17,19 @@ Bölümü aç → hedefi gör → çiçekleri kaydırıp 3+ eşleştir → hedef
 - **Hamle kalmazsa:** Tahta animasyonla karıştırılır, oyuncu cezalandırılmaz.
 
 ## Bölümler
-- İlk sürümde **20 bölüm.**
+- İlk sürümde **30 bölüm.** (Utku'nun kararıyla 20'den 30'a çıktı.)
 - Her bölümün bir hedefi ve hamle sınırı var. Hedef türleri:
   - Belirli bir çiçekten N tane topla ("15 hamlede 20 gül topla")
   - Birden fazla çiçek türünden topla
   - Puan hedefi
-- Zorluk yavaş artar: ilk 3 bölüm öğretici ve çok kolay, sonra hedefler büyür ve hamle sayısı daralır.
+  - Engel hedefleri: saksıları kır, sarmaşıkları çöz, toprağı çiçeklendir
+- **Bölüm çeşitliliği (engeller ve şekiller):**
+  - **Sarmaşık:** Çiçeği sarar; çiçek yer değiştiremez ve düşmez ama eşleşmeye katılabilir. Eşleşmenin parçası olunca ya da yanında bir çiçek patlayınca sarmaşık kopar.
+  - **Saksı (1 veya 2 katlı):** Hücrede çiçek yerine durur, düşmez. Yanında bir patlama olunca bir kat kırılır.
+  - **Toprak:** Çiçeğin altındaki zemin. Üstündeki çiçek patlayınca çiçeklenir.
+  - **Şekilli tahtalar:** Kalp, elmas, kum saati gibi. Engellerin ve boşlukların altındaki hücreler yan sütunlardan çaprazlama dolar.
+- Her engel önce kolay bir tanıtım bölümüyle gelir, sonra diğerleriyle karışır. 15 ve 25 nefes bölümleri, 30 final (kalp tahta, hepsi bir arada).
+- Zorluk yavaş artar: ilk bölümler öğretici ve çok kolay, sonra hedefler büyür ve hamle sayısı daralır. Hamle sayıları ve yıldız eşikleri simülasyonla ayarlanır (bkz. `Tools/LevelTuner`): bir "sıradan oyuncu" botu baştaki bölümleri ~%99, sonlarda ~%65-70 kazanır.
 - **Yıldızlar (1–3):** Kalan hamleye ya da puana göre.
 - **Bölüm haritası:** Basit bir dikey yol. Açık, kilitli ve tamamlanmış bölümler net görünsün.
 - İlerleme ve yıldızlar telefonda kaydedilir.
@@ -53,7 +60,7 @@ Bölümü aç → hedefi gör → çiçekleri kaydırıp 3+ eşleştir → hedef
 - Oyunun adı ona özel olabilir.
 - Bazı bölüm sonlarında ona küçük mesajlar.
 - Aranızdaki şakalar veya özel anlar oyuna gizlenebilir.
-- **Son bölüm (20) bitince sürpriz bir ekran / mesaj.**
+- **Son bölüm (30) bitince sürpriz bir ekran / mesaj.**
 - Bu metinler kodda değil, kolayca düzenlenebilen bir veri dosyasında tutulur.
 
 ## Teknik
@@ -63,10 +70,10 @@ Bölümü aç → hedefi gör → çiçekleri kaydırıp 3+ eşleştir → hedef
 - Çiçek objeleri havuzlanır (object pooling).
 
 ## Kapsam dışı (ilk sürüm)
-Özel taşlar (bomba, roket vb.), engeller (buz, kutu vb.), can/enerji sistemi, reklam, mağaza, online özellikler. Özel taşlar, çekirdek oynanış oturduktan sonra **ilk eklenecek şey** olarak düşünülebilir.
+Özel taşlar (bomba, roket vb.), can/enerji sistemi, reklam, mağaza, online özellikler. Özel taşlar, çekirdek oynanış oturduktan sonra **ilk eklenecek şey** olarak düşünülebilir. (Engeller artık kapsamda; yukarıdaki "Bölüm çeşitliliği" maddesine bakın.)
 
 ## Bitti sayılması için
-- 20 bölüm baştan sona oynanabiliyor, ilerleme kaydediliyor.
+- 30 bölüm baştan sona oynanabiliyor, ilerleme kaydediliyor.
 - Eşleşme, kaskad ve karıştırma hatasız çalışıyor (birim testleri geçiyor).
 - Çiçekler gri tonlamada bile ayırt edilebiliyor.
 - Juice efektleri ve sesler var.

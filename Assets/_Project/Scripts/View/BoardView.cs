@@ -30,6 +30,11 @@ namespace Flowers.View
         /// <summary>A cascade step's flowers start popping. int = step index (0 = the swap's own match, 1+ = chain).</summary>
         public event Action<CascadeStep, int> StepPopping;
 
+        // Sorting orders (higher draws on top).
+        private const int TileOrder = -1;
+        private const int PotOrder = 0;
+        private const int VineOrder = 3;
+
         private struct MoveAnim
         {
             public Transform Target;
@@ -40,10 +45,15 @@ namespace Flowers.View
 
         private readonly List<MoveAnim> _moves = new List<MoveAnim>();
         private readonly List<FlowerView> _popping = new List<FlowerView>();
+        private readonly List<Transform> _obstaclesPopping = new List<Transform>();
+        private readonly List<float> _obstaclePopScales = new List<float>();
 
         private BoardEngine _engine;
         private FlowerView[,] _views;
         private FlowerView[,] _shuffleBuffer;
+        private SpriteRenderer[,] _tiles;
+        private SpriteRenderer[,] _pots;
+        private SpriteRenderer[,] _vines;
         private FlowerPool _pool;
         private Transform _flowerRoot;
         private Transform _backgroundRoot;
@@ -62,6 +72,10 @@ namespace Flowers.View
         public bool CanAcceptInput => _engine != null && !IsBusy && InputEnabled;
         public float SwipeThresholdWorld => config.SwipeThresholdCells * _cell;
         public BoardViewConfig Config => config;
+
+        private float PotScale => _cell * 0.92f;
+        private float VineScale => _cell * 1.0f;
+        private float TileScale => config.TileScale * _cell;
 
         private void Awake()
         {
@@ -87,10 +101,10 @@ namespace Flowers.View
         }
 
         /// <summary>
-        /// Throws away the current board (even mid-animation) and drops in a new one.
-        /// seed 0 = a different board every time.
+        /// Throws away the current board (even mid-animation) and drops in a new one with the layout's shape
+        /// and obstacles. seed 0 = a different board every time.
         /// </summary>
-        public void Build(int width, int height, int typeCount, int seed)
+        public void Build(BoardLayout layout, int typeCount, int seed)
         {
             if (!_ready) return;
             if (typeCount > config.FlowerSprites.Length)
@@ -102,12 +116,12 @@ namespace Flowers.View
             StopAllCoroutines();
             ReleaseAllFlowers();
 
-            _width = width;
-            _height = height;
-            _engine = new BoardEngine(width, height, typeCount, seed != 0 ? seed : Environment.TickCount);
-            _views = new FlowerView[width, height];
-            _shuffleBuffer = new FlowerView[width, height];
-            _pool.Prewarm(width * height + width * 2);
+            _width = layout.Width;
+            _height = layout.Height;
+            _engine = new BoardEngine(layout, typeCount, new System.Random(seed != 0 ? seed : Environment.TickCount));
+            _views = new FlowerView[_width, _height];
+            _shuffleBuffer = new FlowerView[_width, _height];
+            _pool.Prewarm(_width * _height + _width * 2);
 
             BuildBackground();
             FitCamera();
@@ -126,14 +140,14 @@ namespace Flowers.View
             int x = Mathf.RoundToInt(local.x / _cell + (_width - 1) * 0.5f);
             int y = Mathf.RoundToInt(local.y / _cell + (_height - 1) * 0.5f);
             cell = new Position(x, y);
-            return _engine.Grid.IsInside(cell);
+            return _engine.Grid.IsInside(cell) && !_engine.Grid.IsVoid(cell);
         }
 
-        /// <summary>Called by input. Ignored while busy or if b is off the board.</summary>
+        /// <summary>Called by input. Ignored while busy, off the board, or if either cell can't be moved.</summary>
         public void RequestSwap(Position a, Position b)
         {
             if (!CanAcceptInput) return;
-            if (!_engine.Grid.IsInside(a) || !_engine.Grid.IsInside(b) || !a.IsAdjacentTo(b)) return;
+            if (!a.IsAdjacentTo(b) || !_engine.Grid.CanSwap(a) || !_engine.Grid.CanSwap(b)) return;
 
             IsBusy = true;
             StartCoroutine(PlaySwap(a, b));
@@ -194,18 +208,55 @@ namespace Flowers.View
 
         private IEnumerator PlayCascadeStep(CascadeStep step, int stepIndex)
         {
-            // 1. Pop
+            // 1. Pop flowers, and everything the pops broke.
             _popping.Clear();
+            _obstaclesPopping.Clear();
+            _obstaclePopScales.Clear();
             for (int i = 0; i < step.Cleared.Count; i++)
             {
                 var p = step.Cleared[i].Position;
                 _popping.Add(_views[p.X, p.Y]);
                 _views[p.X, p.Y] = null;
             }
+            for (int i = 0; i < step.VinesFreed.Count; i++)
+            {
+                var p = step.VinesFreed[i];
+                if (_vines[p.X, p.Y] == null) continue;
+                _obstaclesPopping.Add(_vines[p.X, p.Y].transform);
+                _obstaclePopScales.Add(VineScale);
+                _vines[p.X, p.Y] = null;
+            }
+            for (int i = 0; i < step.PotHits.Count; i++)
+            {
+                var hit = step.PotHits[i];
+                var pot = _pots[hit.Position.X, hit.Position.Y];
+                if (pot == null) continue;
+                if (hit.LayersLeft > 0)
+                {
+                    pot.sprite = config.PotCrackedSprite;
+                    StartCoroutine(Punch(pot.transform, PotScale));
+                }
+                else
+                {
+                    _obstaclesPopping.Add(pot.transform);
+                    _obstaclePopScales.Add(PotScale);
+                    _pots[hit.Position.X, hit.Position.Y] = null;
+                }
+            }
+            for (int i = 0; i < step.SoilCleared.Count; i++)
+            {
+                var p = step.SoilCleared[i];
+                var tile = _tiles[p.X, p.Y];
+                if (tile == null) continue;
+                tile.sprite = config.TileSprite;
+                tile.color = TileColor(p.X, p.Y);
+                StartCoroutine(Punch(tile.transform, TileScale));
+            }
+
             StepPopping?.Invoke(step, stepIndex);
             yield return PlayPops();
 
-            // 2. Fall + refill, together
+            // 2. Fall (straight or diagonally) + new flowers, together.
             _moves.Clear();
             for (int i = 0; i < step.Falls.Count; i++)
             {
@@ -213,8 +264,8 @@ namespace Flowers.View
                 var flower = _views[fall.From.X, fall.From.Y];
                 _views[fall.From.X, fall.From.Y] = null;
                 _views[fall.To.X, fall.To.Y] = flower;
-                AddFall(flower.transform, CellToLocal(fall.From.X, fall.From.Y), CellToLocal(fall.To.X, fall.To.Y),
-                    fall.From.Y - fall.To.Y);
+                int cells = Mathf.Max(Mathf.Abs(fall.From.Y - fall.To.Y), Mathf.Abs(fall.From.X - fall.To.X));
+                AddFall(flower.transform, CellToLocal(fall.From.X, fall.From.Y), CellToLocal(fall.To.X, fall.To.Y), cells);
             }
 
             for (int i = 0; i < step.Spawns.Count; i++)
@@ -223,7 +274,7 @@ namespace Flowers.View
                 var flower = SpawnFlower(spawn.Type);
                 _views[spawn.Position.X, spawn.Position.Y] = flower;
                 int startY = _height + spawn.IndexInColumn;
-                AddFall(flower.transform, CellToLocal(spawn.Position.X, startY),
+                AddFall(flower.transform, CellToLocal(spawn.Column, startY),
                     CellToLocal(spawn.Position.X, spawn.Position.Y), startY - spawn.Position.Y);
             }
             yield return PlayMoves(EaseType.OutBackSoft);
@@ -233,14 +284,17 @@ namespace Flowers.View
         {
             if (result.ShuffleRegenerated)
             {
-                // Rare fallback: the engine built a brand new board, so pop everything and drop new flowers in.
+                // Rare fallback: the engine re-dealt every flower, so pop them all and drop new ones in.
                 _popping.Clear();
+                _obstaclesPopping.Clear();
+                _obstaclePopScales.Clear();
                 for (int x = 0; x < _width; x++)
                     for (int y = 0; y < _height; y++)
-                    {
-                        _popping.Add(_views[x, y]);
-                        _views[x, y] = null;
-                    }
+                        if (_views[x, y] != null)
+                        {
+                            _popping.Add(_views[x, y]);
+                            _views[x, y] = null;
+                        }
                 yield return PlayPops();
                 yield return DropInAllFlowers();
                 yield break;
@@ -260,7 +314,7 @@ namespace Flowers.View
             yield return PlayMoves(EaseType.InOutQuad);
         }
 
-        /// <summary>Fills the whole board, dropping each column in from above the way refills arrive.</summary>
+        /// <summary>Fills the board, dropping each column in from above the way refills arrive.</summary>
         private IEnumerator DropInAllFlowers()
         {
             _moves.Clear();
@@ -268,6 +322,7 @@ namespace Flowers.View
             for (int x = 0; x < _width; x++)
                 for (int y = 0; y < _height; y++)
                 {
+                    if (grid[x, y] == BoardGrid.Empty) continue;
                     var flower = SpawnFlower(grid[x, y]);
                     _views[x, y] = flower;
                     AddFall(flower.transform, CellToLocal(x, _height + y), CellToLocal(x, y), _height);
@@ -313,23 +368,32 @@ namespace Flowers.View
             _moves.Clear();
         }
 
-        /// <summary>Shrinks and spins every flower in <see cref="_popping"/>, then returns them to the pool.</summary>
+        /// <summary>
+        /// Shrinks and spins every flower in <see cref="_popping"/> (then returns them to the pool) and every
+        /// broken obstacle in <see cref="_obstaclesPopping"/> (then hides it).
+        /// </summary>
         private IEnumerator PlayPops()
         {
-            float baseScale = config.FlowerScale * _cell;
+            float flowerScale = config.FlowerScale * _cell;
             float duration = config.PopDuration;
             float time = 0f;
             while (time < duration)
             {
                 time += Time.deltaTime;
                 float t = Mathf.Clamp01(time / duration);
-                float scale = baseScale * (1f - Ease.Evaluate(EaseType.InBack, t));
+                float shrink = 1f - Ease.Evaluate(EaseType.InBack, t);
                 var rotation = Quaternion.Euler(0f, 0f, 90f * t);
                 for (int i = 0; i < _popping.Count; i++)
                 {
                     var tr = _popping[i].transform;
-                    tr.localScale = new Vector3(scale, scale, 1f);
+                    tr.localScale = new Vector3(flowerScale * shrink, flowerScale * shrink, 1f);
                     tr.localRotation = rotation;
+                }
+                for (int i = 0; i < _obstaclesPopping.Count; i++)
+                {
+                    float s = _obstaclePopScales[i] * shrink;
+                    _obstaclesPopping[i].localScale = new Vector3(s, s, 1f);
+                    _obstaclesPopping[i].localRotation = rotation;
                 }
                 yield return null;
             }
@@ -337,6 +401,26 @@ namespace Flowers.View
             for (int i = 0; i < _popping.Count; i++)
                 _pool.Release(_popping[i]);
             _popping.Clear();
+            for (int i = 0; i < _obstaclesPopping.Count; i++)
+                _obstaclesPopping[i].gameObject.SetActive(false);
+            _obstaclesPopping.Clear();
+            _obstaclePopScales.Clear();
+        }
+
+        /// <summary>Quick squash-and-back on a hit (cracked pot, cleared soil).</summary>
+        private IEnumerator Punch(Transform target, float baseScale)
+        {
+            const float duration = 0.22f;
+            float time = 0f;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = Mathf.Clamp01(time / duration);
+                float s = baseScale * (1f + Mathf.Sin(t * Mathf.PI) * 0.18f);
+                target.localScale = new Vector3(s, s, 1f);
+                yield return null;
+            }
+            target.localScale = new Vector3(baseScale, baseScale, 1f);
         }
 
         // ---------- Setup ----------
@@ -352,6 +436,8 @@ namespace Flowers.View
 
         private Vector3 CellToLocal(int x, int y) =>
             new Vector3((x - (_width - 1) * 0.5f) * _cell, (y - (_height - 1) * 0.5f) * _cell, 0f);
+
+        private Color TileColor(int x, int y) => (x + y) % 2 == 0 ? config.TileColorA : config.TileColorB;
 
         /// <summary>Returns every flower (on the board or mid-pop) to the pool.</summary>
         private void ReleaseAllFlowers()
@@ -369,6 +455,8 @@ namespace Flowers.View
                 if (flower.gameObject.activeSelf)
                     _pool.Release(flower);
             _popping.Clear();
+            _obstaclesPopping.Clear();
+            _obstaclePopScales.Clear();
             _moves.Clear();
         }
 
@@ -378,47 +466,113 @@ namespace Flowers.View
             _backgroundRoot = new GameObject("Background").transform;
             _backgroundRoot.SetParent(transform, false);
 
-            float boardWidth = _width * _cell;
-            float boardHeight = _height * _cell;
+            var grid = _engine.Grid;
+            _tiles = new SpriteRenderer[_width, _height];
+            _pots = new SpriteRenderer[_width, _height];
+            _vines = new SpriteRenderer[_width, _height];
 
-            var frameSize = new Vector2(boardWidth + config.FramePadding * 2f, boardHeight + config.FramePadding * 2f);
+            bool shaped = false;
+            for (int x = 0; x < _width && !shaped; x++)
+                for (int y = 0; y < _height; y++)
+                    if (grid.IsVoid(new Position(x, y))) { shaped = true; break; }
 
-            var shadow = CreateSpriteChild("Shadow", config.FrameSprite, config.BoardShadowColor, -3);
-            shadow.drawMode = SpriteDrawMode.Sliced;
-            shadow.size = frameSize + new Vector2(0.15f, 0.15f);
-            shadow.transform.localPosition = config.BoardShadowOffset;
+            if (shaped) BuildShapedFrame(grid);
+            else BuildRectangleFrame();
 
-            var frame = CreateSpriteChild("Frame", config.FrameSprite, config.FrameColor, -2);
-            frame.drawMode = SpriteDrawMode.Sliced;
-            frame.size = frameSize;
-
-            var tiles = new GameObject("Tiles").transform;
-            tiles.SetParent(_backgroundRoot, false);
-            float tileScale = config.TileScale * _cell;
+            var cells = new GameObject("Cells").transform;
+            cells.SetParent(_backgroundRoot, false);
             for (int x = 0; x < _width; x++)
             {
                 for (int y = 0; y < _height; y++)
                 {
-                    var color = (x + y) % 2 == 0 ? config.TileColorA : config.TileColorB;
-                    var tile = CreateSpriteChild($"Tile {x},{y}", config.TileSprite, color, -1);
-                    tile.transform.SetParent(tiles, false);
+                    var p = new Position(x, y);
+                    if (grid.IsVoid(p)) continue;
+
+                    bool soil = grid.HasSoil(p);
+                    var tile = CreateSpriteChild($"Tile {x},{y}", soil ? config.SoilTileSprite : config.TileSprite,
+                        soil ? Color.white : TileColor(x, y), TileOrder, cells);
                     tile.transform.localPosition = CellToLocal(x, y);
-                    tile.transform.localScale = new Vector3(tileScale, tileScale, 1f);
+                    tile.transform.localScale = new Vector3(TileScale, TileScale, 1f);
+                    _tiles[x, y] = tile;
+
+                    if (grid.PotLayers(p) > 0)
+                    {
+                        var pot = CreateSpriteChild($"Pot {x},{y}", config.PotSprite, Color.white, PotOrder, cells);
+                        pot.transform.localPosition = CellToLocal(x, y);
+                        pot.transform.localScale = new Vector3(PotScale, PotScale, 1f);
+                        _pots[x, y] = pot;
+                    }
+
+                    if (grid.HasVine(p))
+                    {
+                        var vine = CreateSpriteChild($"Vine {x},{y}", config.VineSprite, Color.white, VineOrder, cells);
+                        vine.transform.localPosition = CellToLocal(x, y);
+                        vine.transform.localScale = new Vector3(VineScale, VineScale, 1f);
+                        _vines[x, y] = vine;
+                    }
                 }
             }
+        }
 
-            // Flowers are only drawn inside this mask, so refills appear to slide in from the board's top edge.
+        /// <summary>Plain board: one frame, one soft shadow, one mask over the whole rectangle.</summary>
+        private void BuildRectangleFrame()
+        {
+            float boardWidth = _width * _cell;
+            float boardHeight = _height * _cell;
+            var frameSize = new Vector2(boardWidth + config.FramePadding * 2f, boardHeight + config.FramePadding * 2f);
+
+            var shadow = CreateSpriteChild("Shadow", config.FrameSprite, config.BoardShadowColor, -3, _backgroundRoot);
+            shadow.drawMode = SpriteDrawMode.Sliced;
+            shadow.size = frameSize + new Vector2(0.15f, 0.15f);
+            shadow.transform.localPosition = config.BoardShadowOffset;
+
+            var frame = CreateSpriteChild("Frame", config.FrameSprite, config.FrameColor, -2, _backgroundRoot);
+            frame.drawMode = SpriteDrawMode.Sliced;
+            frame.size = frameSize;
+
+            // Flowers are only drawn inside the mask, so refills appear to slide in from the board's top edge.
             var maskObject = new GameObject("Flower Mask");
             maskObject.transform.SetParent(_backgroundRoot, false);
             maskObject.transform.localScale = new Vector3(boardWidth, boardHeight, 1f);
-            var mask = maskObject.AddComponent<SpriteMask>();
-            mask.sprite = config.MaskSprite;
+            maskObject.AddComponent<SpriteMask>().sprite = config.MaskSprite;
         }
 
-        private SpriteRenderer CreateSpriteChild(string objectName, Sprite sprite, Color color, int sortingOrder)
+        /// <summary>
+        /// Shaped board (heart, diamond...): a frame piece and a mask piece per cell, so the frame and the
+        /// visible area follow the shape. Pieces overlap, which joins them into one outline.
+        /// </summary>
+        private void BuildShapedFrame(BoardGrid grid)
+        {
+            var frames = new GameObject("Frame").transform;
+            frames.SetParent(_backgroundRoot, false);
+            var masks = new GameObject("Flower Mask").transform;
+            masks.SetParent(_backgroundRoot, false);
+            float frameSize = _cell + config.FramePadding * 2f;
+
+            for (int x = 0; x < _width; x++)
+            {
+                for (int y = 0; y < _height; y++)
+                {
+                    if (grid.IsVoid(new Position(x, y))) continue;
+
+                    var frame = CreateSpriteChild($"Frame {x},{y}", config.FrameSprite, config.FrameColor, -2, frames);
+                    frame.drawMode = SpriteDrawMode.Sliced;
+                    frame.size = new Vector2(frameSize, frameSize);
+                    frame.transform.localPosition = CellToLocal(x, y);
+
+                    var maskObject = new GameObject($"Mask {x},{y}");
+                    maskObject.transform.SetParent(masks, false);
+                    maskObject.transform.localPosition = CellToLocal(x, y);
+                    maskObject.transform.localScale = new Vector3(_cell, _cell, 1f);
+                    maskObject.AddComponent<SpriteMask>().sprite = config.MaskSprite;
+                }
+            }
+        }
+
+        private SpriteRenderer CreateSpriteChild(string objectName, Sprite sprite, Color color, int sortingOrder, Transform parent)
         {
             var go = new GameObject(objectName);
-            go.transform.SetParent(_backgroundRoot, false);
+            go.transform.SetParent(parent, false);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             sr.color = color;
@@ -476,7 +630,8 @@ namespace Flowers.View
                 for (int y = 0; y < _height; y++)
                 {
                     var view = _views[x, y];
-                    if (view != null && view.Type == grid[x, y]) continue;
+                    int expected = grid[x, y];
+                    if (view == null ? expected == BoardGrid.Empty : view.Type == expected) continue;
 
                     Debug.LogError($"[Flowers] View is out of sync with the board at ({x},{y}). Rebuilding. Board:\n{grid}", this);
                     RebuildAllFlowers();
@@ -491,6 +646,8 @@ namespace Flowers.View
                 for (int y = 0; y < _height; y++)
                 {
                     if (_views[x, y] != null) _pool.Release(_views[x, y]);
+                    _views[x, y] = null;
+                    if (_engine.Grid[x, y] == BoardGrid.Empty) continue;
                     var flower = SpawnFlower(_engine.Grid[x, y]);
                     flower.transform.localPosition = CellToLocal(x, y);
                     _views[x, y] = flower;
