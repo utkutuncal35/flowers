@@ -2,17 +2,10 @@ using UnityEngine;
 
 namespace Flowers.View
 {
-    /// <summary>Board size, look and animation timing. Edit the asset, not the code.</summary>
+    /// <summary>How the board looks and moves. Board size comes from each level (LevelData). Edit the asset, not the code.</summary>
     [CreateAssetMenu(menuName = "Flowers/Board View Config", fileName = "BoardViewConfig")]
     public class BoardViewConfig : ScriptableObject
     {
-        [Header("Board")]
-        [SerializeField, Min(3)] private int width = 7;
-        [SerializeField, Min(3)] private int height = 9;
-        [SerializeField, Range(3, 6)] private int typeCount = 5;
-        [Tooltip("0 = different board every time. Any other number always gives the same board (handy for bug reports).")]
-        [SerializeField] private int seed;
-
         [Header("Sprites")]
         [Tooltip("One sprite per flower type, index = type id.")]
         [SerializeField] private Sprite[] flowerSprites;
@@ -29,6 +22,8 @@ namespace Flowers.View
         [SerializeField, Min(0f)] private float framePadding = 0.2f;
         [Tooltip("Empty space between the board frame and the screen edge, in world units.")]
         [SerializeField, Min(0f)] private float screenMargin = 0.35f;
+        [Tooltip("Part of the screen height kept free at the top for the HUD (0.14 = 14%).")]
+        [SerializeField, Range(0f, 0.4f)] private float hudReservedTopFraction = 0.14f;
 
         [Header("Colors")]
         [SerializeField] private Color backgroundColor = new Color32(0xFB, 0xF3, 0xEA, 0xFF);
@@ -55,10 +50,6 @@ namespace Flowers.View
         [Tooltip("How far (in cells) the finger has to move before it counts as a swipe.")]
         [SerializeField, Range(0.1f, 1f)] private float swipeThresholdCells = 0.35f;
 
-        public int Width => width;
-        public int Height => height;
-        public int TypeCount => typeCount;
-        public int Seed => seed;
         public Sprite[] FlowerSprites => flowerSprites;
         public Sprite TileSprite => tileSprite;
         public Sprite FrameSprite => frameSprite;
@@ -68,6 +59,7 @@ namespace Flowers.View
         public float TileScale => tileScale;
         public float FramePadding => framePadding;
         public float ScreenMargin => screenMargin;
+        public float HudReservedTopFraction => hudReservedTopFraction;
         public Color BackgroundColor => backgroundColor;
         public Color FrameColor => frameColor;
         public Color TileColorA => tileColorA;
@@ -83,9 +75,9 @@ namespace Flowers.View
         /// <summary>Null if the config is usable, otherwise a message saying what is wrong.</summary>
         public string Validate()
         {
-            if (flowerSprites == null || flowerSprites.Length < typeCount)
-                return $"needs {typeCount} flower sprites but has {(flowerSprites == null ? 0 : flowerSprites.Length)}";
-            for (int i = 0; i < typeCount; i++)
+            if (flowerSprites == null || flowerSprites.Length < 3)
+                return $"needs at least 3 flower sprites but has {(flowerSprites == null ? 0 : flowerSprites.Length)}";
+            for (int i = 0; i < flowerSprites.Length; i++)
                 if (flowerSprites[i] == null)
                     return $"flower sprite {i} is empty";
             if (tileSprite == null) return "tile sprite is empty";

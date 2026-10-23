@@ -12,12 +12,20 @@ namespace Flowers.View
         private readonly FlowerView _prefab;
         private readonly Transform _parent;
         private readonly Stack<FlowerView> _free = new Stack<FlowerView>();
+        private int _created;
 
         public FlowerPool(FlowerView prefab, Transform parent, int prewarm)
         {
             _prefab = prefab;
             _parent = parent;
             for (int i = 0; i < prewarm; i++)
+                Release(Create());
+        }
+
+        /// <summary>Makes sure at least this many flowers exist in total, so play doesn't instantiate.</summary>
+        public void Prewarm(int total)
+        {
+            while (_created < total)
                 Release(Create());
         }
 
@@ -35,6 +43,10 @@ namespace Flowers.View
             _free.Push(flower);
         }
 
-        private FlowerView Create() => Object.Instantiate(_prefab, _parent);
+        private FlowerView Create()
+        {
+            _created++;
+            return Object.Instantiate(_prefab, _parent);
+        }
     }
 }

@@ -92,8 +92,31 @@ namespace Flowers.Editor
             return pixels;
         }
 
-        /// <summary>White rounded square, used for tiles and (9-sliced) for the board frame.</summary>
-        public static byte[] RenderRoundedSquare(int size, float cornerRadius)
+        /// <summary>White rounded square, used for tiles and (9-sliced) for the board frame and UI panels.</summary>
+        public static byte[] RenderRoundedSquare(int size, float cornerRadius) =>
+            RenderWhite(size, (u, v) => InsideRoundedSquare(u, v, 1f, cornerRadius));
+
+        /// <summary>White five-pointed star (tinted in the UI).</summary>
+        public static byte[] RenderStar(int size)
+        {
+            var points = new float[20];
+            for (int k = 0; k < 10; k++)
+            {
+                double angle = Math.PI / 2 + k * Math.PI / 5;
+                float radius = k % 2 == 0 ? 0.95f : 0.42f;
+                points[k * 2] = radius * (float)Math.Cos(angle);
+                points[k * 2 + 1] = radius * (float)Math.Sin(angle) - 0.05f;
+            }
+            return RenderWhite(size, (u, v) => InsidePolygon(points, u, v));
+        }
+
+        /// <summary>White check mark (tinted in the UI).</summary>
+        public static byte[] RenderCheck(int size) =>
+            RenderWhite(size, (u, v) =>
+                DistanceToSegment(u, v, -0.62f, 0.02f, -0.18f, -0.45f) < 0.15f ||
+                DistanceToSegment(u, v, -0.18f, -0.45f, 0.68f, 0.55f) < 0.15f);
+
+        private static byte[] RenderWhite(int size, Func<float, float, bool> inside)
         {
             var pixels = new byte[size * size * 4];
             var white = new Rgb(1f, 1f, 1f);
@@ -106,7 +129,7 @@ namespace Flowers.Editor
                         {
                             float u = (px + 0.25f + 0.5f * sx) / size * 2f - 1f;
                             float v = (py + 0.25f + 0.5f * sy) / size * 2f - 1f;
-                            if (InsideRoundedSquare(u, v, 1f, cornerRadius)) coverage += 0.25f;
+                            if (inside(u, v)) coverage += 0.25f;
                         }
                     if (coverage > 0f) Write(pixels, (py * size + px) * 4, white, coverage);
                 }
@@ -212,6 +235,30 @@ namespace Flowers.Editor
             float qy = Math.Abs(v) - (half - radius);
             if (qx <= 0f || qy <= 0f) return Math.Abs(u) <= half && Math.Abs(v) <= half;
             return qx * qx + qy * qy <= radius * radius;
+        }
+
+        /// <summary>Even-odd rule; points = x0,y0,x1,y1,...</summary>
+        private static bool InsidePolygon(float[] points, float u, float v)
+        {
+            bool inside = false;
+            int n = points.Length / 2;
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                float xi = points[i * 2], yi = points[i * 2 + 1];
+                float xj = points[j * 2], yj = points[j * 2 + 1];
+                if ((yi > v) != (yj > v) && u < (xj - xi) * (v - yi) / (yj - yi) + xi)
+                    inside = !inside;
+            }
+            return inside;
+        }
+
+        private static float DistanceToSegment(float u, float v, float ax, float ay, float bx, float by)
+        {
+            float dx = bx - ax, dy = by - ay;
+            float t = ((u - ax) * dx + (v - ay) * dy) / (dx * dx + dy * dy);
+            t = t < 0f ? 0f : t > 1f ? 1f : t;
+            float px = ax + t * dx - u, py = ay + t * dy - v;
+            return (float)Math.Sqrt(px * px + py * py);
         }
 
         private static float[] MakeRing(float radius, int count)

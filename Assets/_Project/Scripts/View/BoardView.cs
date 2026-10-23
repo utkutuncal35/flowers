@@ -10,12 +10,16 @@ namespace Flowers.View
     /// Shows the board and plays back what <see cref="BoardEngine"/> decided.
     /// It never decides game rules itself: it asks the engine, then animates the result step by step.
     /// While an animation runs <see cref="IsBusy"/> is true and new swaps are ignored.
+    /// Call <see cref="Build"/> to start (or restart) a board; nothing is shown before that.
     /// </summary>
     public class BoardView : MonoBehaviour
     {
         [SerializeField] private BoardViewConfig config;
         [SerializeField] private FlowerView flowerPrefab;
         [SerializeField] private Camera targetCamera;
+
+        /// <summary>Fired when a swap's animations have fully finished (valid or not).</summary>
+        public event Action<SwapResult> SwapFinished;
 
         private struct MoveAnim
         {
@@ -33,6 +37,7 @@ namespace Flowers.View
         private FlowerView[,] _shuffleBuffer;
         private FlowerPool _pool;
         private Transform _flowerRoot;
+        private Transform _backgroundRoot;
         private int _width;
         private int _height;
         private float _cell;
@@ -41,8 +46,13 @@ namespace Flowers.View
         private bool _ready;
 
         public bool IsBusy { get; private set; }
-        public bool CanAcceptInput => _ready && !IsBusy;
+
+        /// <summary>Set false to freeze the board (e.g. while a win/lose screen is open).</summary>
+        public bool InputEnabled { get; set; } = true;
+
+        public bool CanAcceptInput => _engine != null && !IsBusy && InputEnabled;
         public float SwipeThresholdWorld => config.SwipeThresholdCells * _cell;
+        public BoardViewConfig Config => config;
 
         private void Awake()
         {
@@ -52,41 +62,62 @@ namespace Flowers.View
                 return;
             }
 
-            _width = config.Width;
-            _height = config.Height;
             _cell = config.CellSize;
-
-            int seed = config.Seed != 0 ? config.Seed : Environment.TickCount;
-            _engine = new BoardEngine(_width, _height, config.TypeCount, seed);
-            _views = new FlowerView[_width, _height];
-            _shuffleBuffer = new FlowerView[_width, _height];
-
             targetCamera.backgroundColor = config.BackgroundColor;
-            BuildBackground();
-            _pool = new FlowerPool(flowerPrefab, _flowerRoot, _width * _height + _width * 2);
-            _ready = true;
-        }
 
-        private void Start()
-        {
-            FitCamera();
-            StartCoroutine(PlayIntro());
+            _flowerRoot = new GameObject("Flowers").transform;
+            _flowerRoot.SetParent(transform, false);
+            _pool = new FlowerPool(flowerPrefab, _flowerRoot, 0);
+            _ready = true;
         }
 
         private void LateUpdate()
         {
-            if (Screen.width != _lastScreenWidth || Screen.height != _lastScreenHeight)
+            if (_engine != null && (Screen.width != _lastScreenWidth || Screen.height != _lastScreenHeight))
                 FitCamera();
+        }
+
+        /// <summary>
+        /// Throws away the current board (even mid-animation) and drops in a new one.
+        /// seed 0 = a different board every time.
+        /// </summary>
+        public void Build(int width, int height, int typeCount, int seed)
+        {
+            if (!_ready) return;
+            if (typeCount > config.FlowerSprites.Length)
+            {
+                Debug.LogError($"[Flowers] Level wants {typeCount} flower types but BoardViewConfig only has {config.FlowerSprites.Length} sprites.", this);
+                return;
+            }
+
+            StopAllCoroutines();
+            ReleaseAllFlowers();
+
+            _width = width;
+            _height = height;
+            _engine = new BoardEngine(width, height, typeCount, seed != 0 ? seed : Environment.TickCount);
+            _views = new FlowerView[width, height];
+            _shuffleBuffer = new FlowerView[width, height];
+            _pool.Prewarm(width * height + width * 2);
+
+            BuildBackground();
+            FitCamera();
+
+            IsBusy = true;
+            StartCoroutine(PlayIntro());
         }
 
         /// <summary>World position → board cell. False if the point is outside the board.</summary>
         public bool TryGetCell(Vector3 worldPosition, out Position cell)
         {
+            cell = default;
+            if (_engine == null) return false;
+
             Vector3 local = transform.InverseTransformPoint(worldPosition);
             int x = Mathf.RoundToInt(local.x / _cell + (_width - 1) * 0.5f);
             int y = Mathf.RoundToInt(local.y / _cell + (_height - 1) * 0.5f);
             cell = new Position(x, y);
-            return _ready && _engine.Grid.IsInside(cell);
+            return _engine.Grid.IsInside(cell);
         }
 
         /// <summary>Called by input. Ignored while busy or if b is off the board.</summary>
@@ -131,6 +162,7 @@ namespace Flowers.View
                 yield return PlayMoves(EaseType.OutBack);
                 flowerA.SetOnTop(false);
                 IsBusy = false;
+                SwapFinished?.Invoke(result);
                 yield break;
             }
 
@@ -146,6 +178,7 @@ namespace Flowers.View
 
             CheckViewMatchesBoard();
             IsBusy = false;
+            SwapFinished?.Invoke(result);
         }
 
         private IEnumerator PlayCascadeStep(CascadeStep step)
@@ -306,8 +339,31 @@ namespace Flowers.View
         private Vector3 CellToLocal(int x, int y) =>
             new Vector3((x - (_width - 1) * 0.5f) * _cell, (y - (_height - 1) * 0.5f) * _cell, 0f);
 
+        /// <summary>Returns every flower (on the board or mid-pop) to the pool.</summary>
+        private void ReleaseAllFlowers()
+        {
+            if (_views != null)
+                for (int x = 0; x < _width; x++)
+                    for (int y = 0; y < _height; y++)
+                        if (_views[x, y] != null)
+                        {
+                            _pool.Release(_views[x, y]);
+                            _views[x, y] = null;
+                        }
+
+            foreach (var flower in _popping)
+                if (flower.gameObject.activeSelf)
+                    _pool.Release(flower);
+            _popping.Clear();
+            _moves.Clear();
+        }
+
         private void BuildBackground()
         {
+            if (_backgroundRoot != null) Destroy(_backgroundRoot.gameObject);
+            _backgroundRoot = new GameObject("Background").transform;
+            _backgroundRoot.SetParent(transform, false);
+
             float boardWidth = _width * _cell;
             float boardHeight = _height * _cell;
 
@@ -316,7 +372,7 @@ namespace Flowers.View
             frame.size = new Vector2(boardWidth + config.FramePadding * 2f, boardHeight + config.FramePadding * 2f);
 
             var tiles = new GameObject("Tiles").transform;
-            tiles.SetParent(transform, false);
+            tiles.SetParent(_backgroundRoot, false);
             float tileScale = config.TileScale * _cell;
             for (int x = 0; x < _width; x++)
             {
@@ -332,19 +388,16 @@ namespace Flowers.View
 
             // Flowers are only drawn inside this mask, so refills appear to slide in from the board's top edge.
             var maskObject = new GameObject("Flower Mask");
-            maskObject.transform.SetParent(transform, false);
+            maskObject.transform.SetParent(_backgroundRoot, false);
             maskObject.transform.localScale = new Vector3(boardWidth, boardHeight, 1f);
             var mask = maskObject.AddComponent<SpriteMask>();
             mask.sprite = config.MaskSprite;
-
-            _flowerRoot = new GameObject("Flowers").transform;
-            _flowerRoot.SetParent(transform, false);
         }
 
         private SpriteRenderer CreateSpriteChild(string objectName, Sprite sprite, Color color, int sortingOrder)
         {
             var go = new GameObject(objectName);
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(_backgroundRoot, false);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             sr.color = color;
@@ -362,10 +415,14 @@ namespace Flowers.View
             float neededHeight = _height * _cell + extra;
             float aspect = Mathf.Max(0.01f, targetCamera.aspect);
 
+            // The top part of the screen is kept free for the HUD; the board is centered in what's left.
+            float reserved = config.HudReservedTopFraction;
+            float size = Mathf.Max(neededHeight * 0.5f / (1f - reserved), neededWidth * 0.5f / aspect);
+
             targetCamera.orthographic = true;
-            targetCamera.orthographicSize = Mathf.Max(neededHeight * 0.5f, neededWidth * 0.5f / aspect);
+            targetCamera.orthographicSize = size;
             var boardPos = transform.position;
-            targetCamera.transform.position = new Vector3(boardPos.x, boardPos.y, boardPos.z - 10f);
+            targetCamera.transform.position = new Vector3(boardPos.x, boardPos.y + size * reserved, boardPos.z - 10f);
         }
 
         private bool HasRequiredReferences()

@@ -14,6 +14,7 @@ namespace Flowers.Editor
         private const int FrameSize = 128;
         private const int FrameBorder = 40;
         private const int MaskSize = 8;
+        private const int IconSize = 128;
 
         public struct Result
         {
@@ -21,6 +22,8 @@ namespace Flowers.Editor
             public Sprite Tile;
             public Sprite Frame;
             public Sprite Mask;
+            public Sprite Star;
+            public Sprite Check;
         }
 
         public static Result GenerateAll()
@@ -37,6 +40,8 @@ namespace Flowers.Editor
             result.Tile = WriteSprite($"{Folder}/Tile.png", PlaceholderShapes.RenderRoundedSquare(TileSize, 0.28f), TileSize, 0);
             result.Frame = WriteSprite($"{Folder}/Frame.png", PlaceholderShapes.RenderRoundedSquare(FrameSize, 0.6f), FrameSize, FrameBorder);
             result.Mask = WriteSprite($"{Folder}/Mask.png", PlaceholderShapes.RenderSolidSquare(MaskSize), MaskSize, 0);
+            result.Star = WriteSprite($"{Folder}/Star.png", PlaceholderShapes.RenderStar(IconSize), IconSize, 0);
+            result.Check = WriteSprite($"{Folder}/Check.png", PlaceholderShapes.RenderCheck(IconSize), IconSize, 0);
             return result;
         }
 
