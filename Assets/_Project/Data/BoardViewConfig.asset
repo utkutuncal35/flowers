@@ -13,24 +13,27 @@ MonoBehaviour:
   m_Name: BoardViewConfig
   m_EditorClassIdentifier: Assembly-CSharp::Flowers.View.BoardViewConfig
   flowerSprites:
-  - {fileID: 21300000, guid: 445201c8068d2e0478a8cbdf7c801772, type: 3}
-  - {fileID: 21300000, guid: 5a692f60bd601784bad0e1b1545d555c, type: 3}
-  - {fileID: 21300000, guid: 7919dfda8f7485645a1c8fc338b16849, type: 3}
-  - {fileID: 21300000, guid: c8c7c7f3f9a83c64a994c340fc7a2ce5, type: 3}
-  - {fileID: 21300000, guid: 946f96fe30f81ab4893f0db6703f4072, type: 3}
-  tileSprite: {fileID: 21300000, guid: 04f740775fff50c4aa9fb26c77fd82f3, type: 3}
-  frameSprite: {fileID: 21300000, guid: 80efc388aca0d5347bac9c138ae89c9b, type: 3}
-  maskSprite: {fileID: 21300000, guid: b74af76c67d478446b78e5b87c5188c0, type: 3}
+  - {fileID: 21300000, guid: c971e37b8704b37498d4cebab1985bb3, type: 3}
+  - {fileID: 21300000, guid: f419928eb472893498cd03bc5d4a320c, type: 3}
+  - {fileID: 21300000, guid: 81f9005f433c2d243983edeb1cfc8e86, type: 3}
+  - {fileID: 21300000, guid: 718249f1b5e4b0040a17c23a7ac6d46d, type: 3}
+  - {fileID: 21300000, guid: 70b7a56b43f9b964eaa2efe59de9c2ec, type: 3}
+  tileSprite: {fileID: 21300000, guid: 4f1970a391611a246a9dd08c0c9ce713, type: 3}
+  frameSprite: {fileID: 21300000, guid: 2ee5145b30b299e4e8255b94f1403465, type: 3}
+  maskSprite: {fileID: 21300000, guid: 6c2b1d0a35045f74396702e4e1326692, type: 3}
   cellSize: 1
   flowerScale: 0.86
   tileScale: 0.94
   framePadding: 0.2
   screenMargin: 0.35
   hudReservedTopFraction: 0.14
-  backgroundColor: {r: 0.9843137, g: 0.9529412, b: 0.91764706, a: 1}
-  frameColor: {r: 0.5568628, g: 0.17254902, b: 0.28235295, a: 1}
-  tileColorA: {r: 0.9607843, g: 0.88235295, b: 0.8666667, a: 1}
-  tileColorB: {r: 0.9254902, g: 0.8156863, b: 0.8039216, a: 1}
+  backgroundColor: {r: 0.9882353, g: 0.8784314, b: 0.8627451, a: 1}
+  frameColor: {r: 0.5568628, g: 0.17254902, b: 0.28235295, a: 0.9490196}
+  tileColorA: {r: 1, g: 0.96862745, b: 0.93333334, a: 0.9411765}
+  tileColorB: {r: 0.9843137, g: 0.8901961, b: 0.9098039, a: 0.9411765}
+  boardShadowColor: {r: 0.2901961, g: 0.050980393, b: 0.13333334, a: 0.3137255}
+  boardShadowOffset: {x: 0, y: -0.18}
+  lookVersion: 2
   swapDuration: 0.25
   invalidSwapReturnDuration: 0.3
   popDuration: 0.25

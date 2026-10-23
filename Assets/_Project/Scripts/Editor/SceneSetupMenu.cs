@@ -1,22 +1,20 @@
 using System.Collections.Generic;
 using Flowers.Core;
 using Flowers.Levels;
-using Flowers.UI;
 using Flowers.View;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.UI;
+using static Flowers.Editor.Wiring;
 
 namespace Flowers.Editor
 {
     /// <summary>
     /// Builds the game scene from scratch and wires every reference. Safe to run again at any time:
     /// whenever a new component or serialized field is added, it gets wired here.
-    /// Kept between runs: BoardViewConfig values, the level assets and the LevelList (only created if missing).
+    /// Kept between runs: BoardViewConfig / JuiceConfig tuning, the level assets and the LevelList.
+    /// The UI screens themselves are built by <see cref="UiScreensBuilder"/>.
     /// </summary>
     public static class SceneSetupMenu
     {
@@ -29,28 +27,15 @@ namespace Flowers.Editor
         private const string ParticleMaterialPath = "Assets/_Project/Art/Materials/Petals.mat";
         private const string UnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
 
-        // UI palette (reference resolution 1080x1920)
-        private static readonly Color Bordo = new Color32(0x6A, 0x14, 0x30, 0xFF);
-        private static readonly Color BordoButton = new Color32(0x8E, 0x2C, 0x48, 0xFF);
-        private static readonly Color Cream = new Color32(0xFF, 0xF7, 0xEE, 0xFF);
-        private static readonly Color HudBackground = new Color32(0xF5, 0xE1, 0xDD, 0xFF);
-        private static readonly Color LightPink = new Color32(0xF7, 0xA9, 0xC3, 0xFF);
-        private static readonly Color LeafGreen = new Color32(0x5E, 0x8C, 0x4A, 0xFF);
-        private static readonly Color Dim = new Color(0.2f, 0.03f, 0.08f, 0.55f);
-        private static readonly Color StarRed = new Color32(0xC8, 0x1D, 0x3F, 0xFF);
-        private static readonly Color LockGray = new Color32(0xB9, 0xA3, 0xA0, 0xFF);
-
-        private static bool _wiringFailed;
-
         [MenuItem("Flowers/Setup Scene")]
         public static void SetupScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
 
-            _wiringFailed = false;
+            Wiring.Reset();
 
-            var art = PlaceholderArt.GenerateAll();
+            var art = GameArt.GenerateAll();
             CreateOrUpdateConfig(art);
             CreateFlowerPrefab(art.Flowers[0]);
             CreateSampleLevelsIfMissing();
@@ -60,7 +45,7 @@ namespace Flowers.Editor
 
             BuildScene();
 
-            if (_wiringFailed)
+            if (Wiring.Failed)
                 Debug.LogError("[Flowers] Setup Scene finished with wiring errors (see above). The scene will not work until they are fixed.");
             else
                 Debug.Log($"[Flowers] Setup Scene done: {ScenePath} is open and set as the first build scene. Press Play.");
@@ -88,8 +73,7 @@ namespace Flowers.Editor
             var shader = Shader.Find(UnlitSpriteShader);
             if (shader == null)
             {
-                Debug.LogError($"[Flowers] Setup: shader '{UnlitSpriteShader}' not found.");
-                _wiringFailed = true;
+                Fail($"shader '{UnlitSpriteShader}' not found.");
                 return;
             }
 
@@ -105,7 +89,7 @@ namespace Flowers.Editor
             EditorUtility.SetDirty(material);
         }
 
-        private static void CreateOrUpdateConfig(PlaceholderArt.Result art)
+        private static void CreateOrUpdateConfig(GameArt.Result art)
         {
             EditorFolders.Ensure("Assets/_Project/Data");
             var config = AssetDatabase.LoadAssetAtPath<BoardViewConfig>(ConfigPath);
@@ -115,6 +99,8 @@ namespace Flowers.Editor
                 AssetDatabase.CreateAsset(config, ConfigPath);
             }
 
+            if (config.EditorUpgradeLook())
+                Debug.Log("[Flowers] BoardViewConfig colors updated to the new look.");
             config.EditorAssignSprites(art.Flowers, art.Tile, art.Frame, art.Mask);
             EditorUtility.SetDirty(config);
         }
@@ -192,17 +178,12 @@ namespace Flowers.Editor
             var prefabObject = AssetDatabase.LoadAssetAtPath<GameObject>(FlowerPrefabPath);
             var flowerPrefab = prefabObject != null ? prefabObject.GetComponent<FlowerView>() : null;
             var levelList = AssetDatabase.LoadAssetAtPath<LevelList>(LevelListPath);
-            var panelSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Frame.png");
-            var starSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Star.png");
-            var checkSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Check.png");
-            var circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Circle.png");
-            var lockSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Lock.png");
             var juiceConfig = AssetDatabase.LoadAssetAtPath<JuiceConfig>(JuiceConfigPath);
             var particleMaterial = AssetDatabase.LoadAssetAtPath<Material>(ParticleMaterialPath);
+            var sprites = LoadUiSprites(config);
             if (config == null)
             {
-                Debug.LogError($"[Flowers] Setup: could not load {ConfigPath}.");
-                _wiringFailed = true;
+                Fail($"could not load {ConfigPath}.");
                 return;
             }
 
@@ -221,6 +202,15 @@ namespace Flowers.Editor
             light.intensity = 1f;
             light.color = Color.white;
 
+            // Garden picture behind the board, always covering the camera view.
+            var background = new GameObject("Background");
+            var backgroundRenderer = background.AddComponent<SpriteRenderer>();
+            backgroundRenderer.sprite = sprites.Garden;
+            backgroundRenderer.sortingOrder = -100;
+            var cover = background.AddComponent<CameraBackground>();
+            Wire(cover, "targetCamera", camera);
+            Wire(cover, "spriteRenderer", backgroundRenderer);
+
             var board = new GameObject("Board");
             var boardView = board.AddComponent<BoardView>();
             Wire(boardView, "config", config);
@@ -238,38 +228,60 @@ namespace Flowers.Editor
             var petals = CreateParticles("Petals", board.transform, particleMaterial, gravity: 6f, endSize: 0.4f, sortingOrder: 10);
             var confetti = CreateParticles("Confetti", board.transform, particleMaterial, gravity: 0.6f, endSize: 0.8f, sortingOrder: 20);
 
-            var canvas = CreateCanvas();
-            canvas.gameObject.AddComponent<ButtonClickSounds>();
-            CreateEventSystem();
-            var hud = CreateHud(canvas, panelSprite, checkSprite);
-            var praise = CreatePraiseText(canvas);
+            var ui = UiScreensBuilder.Build(sprites);
 
             var juice = board.AddComponent<BoardJuice>();
             Wire(juice, "boardView", boardView);
             Wire(juice, "config", juiceConfig);
             Wire(juice, "petals", petals);
             Wire(juice, "confetti", confetti);
-            Wire(juice, "praiseText", praise);
+            Wire(juice, "praiseText", ui.Praise);
             Wire(juice, "targetCamera", camera);
-            var winScreen = CreateEndScreen(canvas, "Win Screen", panelSprite, starSprite, withStars: true);
-            var loseScreen = CreateEndScreen(canvas, "Lose Screen", panelSprite, starSprite, withStars: false);
-            // Created last so it draws over everything else on the canvas.
-            var mapScreen = CreateMapScreen(canvas, circleSprite, lockSprite, starSprite);
 
             var game = new GameObject("Game");
             var controller = game.AddComponent<LevelController>();
             Wire(controller, "levelList", levelList);
             Wire(controller, "boardView", boardView);
-            Wire(controller, "hud", hud);
-            Wire(controller, "winScreen", winScreen);
-            Wire(controller, "loseScreen", loseScreen);
-            Wire(controller, "mapScreen", mapScreen);
+            Wire(controller, "hud", ui.Hud);
+            Wire(controller, "winScreen", ui.Win);
+            Wire(controller, "loseScreen", ui.Lose);
+            Wire(controller, "mapScreen", ui.Map);
+            Wire(controller, "titleScreen", ui.Title);
+            Wire(controller, "levelStartPopup", ui.LevelStart);
             Wire(controller, "boardJuice", juice);
-            Wire(controller, "scoreIcon", starSprite);
+            Wire(controller, "scoreIcon", sprites.Star);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             Selection.activeGameObject = game;
+        }
+
+        private static UiScreensBuilder.Sprites LoadUiSprites(BoardViewConfig config)
+        {
+            Sprite Load(string path)
+            {
+                var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sprite == null) Fail($"sprite missing: {path}");
+                return sprite;
+            }
+
+            return new UiScreensBuilder.Sprites
+            {
+                Panel = Load(GameArt.PanelPath),
+                Button = Load(GameArt.ButtonPath),
+                Round = Load(GameArt.RoundButtonPath),
+                Star = Load(GameArt.StarPath),
+                Check = Load(GameArt.CheckPath),
+                Circle = Load(GameArt.CirclePath),
+                Lock = Load(GameArt.LockPath),
+                Ribbon = Load(GameArt.RibbonPath),
+                Rays = Load(GameArt.RaysPath),
+                Marker = Load(GameArt.MarkerPath),
+                Garden = Load(GameArt.GardenPath),
+                Meadow = Load(GameArt.MapMeadowPath),
+                SkyCap = Load(GameArt.MapSkyCapPath),
+                Flowers = config != null ? config.FlowerSprites : new Sprite[0],
+            };
         }
 
         /// <summary>
@@ -315,302 +327,8 @@ namespace Flowers.Editor
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             renderer.sharedMaterial = material;
             renderer.sortingOrder = sortingOrder;
-            if (material == null)
-            {
-                Debug.LogError($"[Flowers] Setup: particle material missing for {name}.");
-                _wiringFailed = true;
-            }
+            if (material == null) Fail($"particle material missing for {name}.");
             return ps;
-        }
-
-        private static PraiseText CreatePraiseText(Transform canvas)
-        {
-            var rect = UiBuilder.CreateRect("Praise", canvas);
-            UiBuilder.Place(rect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1000f, 220f));
-            var group = rect.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 0f;
-
-            var label = UiBuilder.CreateText("Label", rect, "Harika!", 120, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Stretch(label.rectTransform);
-            var outline = label.gameObject.AddComponent<Outline>();
-            outline.effectColor = Cream;
-            outline.effectDistance = new Vector2(5f, -5f);
-
-            var praise = rect.gameObject.AddComponent<PraiseText>();
-            Wire(praise, "label", label);
-            Wire(praise, "canvasGroup", group);
-            return praise;
-        }
-
-        private static Transform CreateCanvas()
-        {
-            var go = new GameObject("Canvas", typeof(RectTransform));
-            go.layer = LayerMask.NameToLayer("UI");
-            var canvas = go.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = go.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080f, 1920f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-            go.AddComponent<GraphicRaycaster>();
-            return go.transform;
-        }
-
-        /// <summary>Buttons need an EventSystem. The Input System UI module is required (the old input API is off).</summary>
-        private static void CreateEventSystem()
-        {
-            var go = new GameObject("EventSystem");
-            go.AddComponent<EventSystem>();
-            var module = go.AddComponent<InputSystemUIInputModule>();
-            module.AssignDefaultActions();
-        }
-
-        private static LevelHud CreateHud(Transform canvas, Sprite panelSprite, Sprite checkSprite)
-        {
-            var background = UiBuilder.CreateImage("HUD", canvas, panelSprite, HudBackground, sliced: true);
-            var root = background.rectTransform;
-            root.anchorMin = new Vector2(0f, 1f);
-            root.anchorMax = new Vector2(1f, 1f);
-            root.pivot = new Vector2(0.5f, 1f);
-            root.offsetMin = new Vector2(30f, -270f);
-            root.offsetMax = new Vector2(-30f, -30f);
-
-            var mapButton = UiBuilder.CreateButton("Map Button", root, panelSprite, BordoButton, "Harita", Cream, 34);
-            UiBuilder.Place((RectTransform)mapButton.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -16f), new Vector2(170f, 62f));
-
-            var levelText = UiBuilder.CreateText("Level", root, "Bölüm 1", 40, Bordo, TextAnchor.MiddleLeft);
-            UiBuilder.Place(levelText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(214f, -22f), new Vector2(260f, 50f));
-
-            var movesLabel = UiBuilder.CreateText("Moves Label", root, "Hamle", 36, Bordo);
-            UiBuilder.Place(movesLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, 20f), new Vector2(200f, 50f));
-            var movesText = UiBuilder.CreateText("Moves", root, "20", 96, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Place(movesText.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, -45f), new Vector2(200f, 110f));
-
-            var goals = UiBuilder.CreateRect("Goals", root);
-            goals.anchorMin = new Vector2(0f, 0f);
-            goals.anchorMax = new Vector2(1f, 1f);
-            goals.offsetMin = new Vector2(260f, 15f);
-            goals.offsetMax = new Vector2(-30f, -15f);
-            var layout = goals.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.childAlignment = TextAnchor.MiddleRight;
-            layout.spacing = 28f;
-            layout.childControlWidth = false;
-            layout.childControlHeight = false;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-
-            var template = CreateGoalItem(goals, checkSprite);
-
-            var hud = background.gameObject.AddComponent<LevelHud>();
-            Wire(hud, "levelText", levelText);
-            Wire(hud, "movesText", movesText);
-            Wire(hud, "goalsContainer", goals);
-            Wire(hud, "goalTemplate", template);
-            Wire(hud, "mapButton", mapButton);
-            return hud;
-        }
-
-        private static GoalItemView CreateGoalItem(Transform parent, Sprite checkSprite)
-        {
-            var root = UiBuilder.CreateRect("Goal Template", parent);
-            root.sizeDelta = new Vector2(140f, 200f);
-
-            var icon = UiBuilder.CreateImage("Icon", root, null, Color.white);
-            UiBuilder.Place(icon.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(120f, 120f));
-
-            var count = UiBuilder.CreateText("Count", root, "10", 56, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Place(count.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(140f, 70f));
-
-            var check = UiBuilder.CreateImage("Check", root, checkSprite, LeafGreen);
-            UiBuilder.Place(check.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(64f, 64f));
-
-            var item = root.gameObject.AddComponent<GoalItemView>();
-            Wire(item, "icon", icon);
-            Wire(item, "countText", count);
-            Wire(item, "checkMark", check);
-            root.gameObject.SetActive(false);
-            return item;
-        }
-
-        private static LevelEndScreen CreateEndScreen(Transform canvas, string name, Sprite panelSprite, Sprite starSprite, bool withStars)
-        {
-            // Full-screen dim layer; it also blocks touches from reaching anything behind it.
-            var dim = UiBuilder.CreateImage(name, canvas, null, Dim);
-            dim.raycastTarget = true;
-            UiBuilder.Stretch(dim.rectTransform);
-
-            float cardHeight = withStars ? 900f : 720f;
-            var card = UiBuilder.CreateImage("Card", dim.transform, panelSprite, Cream, sliced: true);
-            UiBuilder.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(840f, cardHeight));
-
-            var title = UiBuilder.CreateText("Title", card.transform, "Tebrikler!", 84, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(780f, 110f));
-
-            var message = UiBuilder.CreateText("Message", card.transform, "", 44, Bordo);
-            UiBuilder.Place(message.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(780f, 130f));
-
-            var stars = new Image[withStars ? 3 : 0];
-            for (int i = 0; i < stars.Length; i++)
-            {
-                stars[i] = UiBuilder.CreateImage($"Star {i + 1}", card.transform, starSprite, Color.white);
-                // Middle star a bit bigger and higher, like most match-3 games.
-                float size = i == 1 ? 200f : 160f;
-                float y = i == 1 ? -420f : -440f;
-                UiBuilder.Place(stars[i].rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 210f, y), new Vector2(size, size));
-            }
-
-            // Harita | Tekrar | Sonraki. "Sonraki" may be hidden (no unlocked next level).
-            var buttonSize = new Vector2(240f, 140f);
-            var map = UiBuilder.CreateButton("Map Button", card.transform, panelSprite, HudBackground, "Harita", Bordo, 44);
-            UiBuilder.Place((RectTransform)map.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-260f, 60f), buttonSize);
-            var retry = UiBuilder.CreateButton("Retry Button", card.transform, panelSprite, LightPink, "Tekrar", Bordo, 44);
-            UiBuilder.Place((RectTransform)retry.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 60f), buttonSize);
-            var next = UiBuilder.CreateButton("Next Button", card.transform, panelSprite, BordoButton, "Sonraki", Cream, 44);
-            UiBuilder.Place((RectTransform)next.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 60f), buttonSize);
-
-            var screen = dim.gameObject.AddComponent<LevelEndScreen>();
-            Wire(screen, "titleText", title);
-            Wire(screen, "messageText", message);
-            Wire(screen, "retryButton", retry);
-            Wire(screen, "nextButton", next);
-            Wire(screen, "mapButton", map);
-            WireArray(screen, "stars", stars);
-            dim.gameObject.SetActive(false);
-            return screen;
-        }
-
-        private static LevelMapScreen CreateMapScreen(Transform canvas, Sprite circleSprite, Sprite lockSprite, Sprite starSprite)
-        {
-            // Opaque background: covers the board and blocks touches while the map is open.
-            var background = UiBuilder.CreateImage("Map Screen", canvas, null, Cream);
-            background.raycastTarget = true;
-            UiBuilder.Stretch(background.rectTransform);
-            var root = background.rectTransform;
-
-            var title = UiBuilder.CreateText("Title", root, "Çiçek Bahçesi", 76, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(1000f, 100f));
-
-            var totalStar = UiBuilder.CreateImage("Total Star", root, starSprite, StarRed);
-            UiBuilder.Place(totalStar.rectTransform, new Vector2(0.5f, 1f), new Vector2(1f, 0.5f), new Vector2(-10f, -205f), new Vector2(56f, 56f));
-            var starsText = UiBuilder.CreateText("Total Stars", root, "0 / 0", 44, Bordo, TextAnchor.MiddleLeft);
-            UiBuilder.Place(starsText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 0.5f), new Vector2(10f, -205f), new Vector2(300f, 60f));
-
-            // Scroll area under the title.
-            var scrollRoot = UiBuilder.CreateRect("Scroll", root);
-            UiBuilder.Stretch(scrollRoot, top: 260f);
-            var scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Elastic;
-            scroll.scrollSensitivity = 30f;
-
-            var viewport = UiBuilder.CreateRect("Viewport", scrollRoot);
-            UiBuilder.Stretch(viewport);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            // An invisible graphic so drags anywhere in the viewport scroll the map.
-            var hitArea = viewport.gameObject.AddComponent<Image>();
-            hitArea.color = new Color(1f, 1f, 1f, 0f);
-
-            var content = UiBuilder.CreateRect("Content", viewport);
-            content.anchorMin = new Vector2(0f, 0f);
-            content.anchorMax = new Vector2(1f, 0f);
-            content.pivot = new Vector2(0.5f, 0f);
-            content.anchoredPosition = Vector2.zero;
-            content.sizeDelta = new Vector2(0f, 2000f);
-
-            scroll.viewport = viewport;
-            scroll.content = content;
-
-            var node = CreateLevelNode(content, circleSprite, lockSprite, starSprite);
-
-            var map = background.gameObject.AddComponent<LevelMapScreen>();
-            Wire(map, "scrollRect", scroll);
-            Wire(map, "content", content);
-            Wire(map, "nodeTemplate", node);
-            Wire(map, "starsText", starsText);
-            Wire(map, "dotSprite", circleSprite);
-            background.gameObject.SetActive(false);
-            return map;
-        }
-
-        private static LevelNodeView CreateLevelNode(Transform content, Sprite circleSprite, Sprite lockSprite, Sprite starSprite)
-        {
-            var root = UiBuilder.CreateRect("Level Node Template", content);
-            UiBuilder.Place(root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180f, 180f));
-
-            var circle = UiBuilder.CreateImage("Circle", root, circleSprite, Color.white);
-            circle.raycastTarget = true;
-            UiBuilder.Stretch(circle.rectTransform);
-            var button = circle.gameObject.AddComponent<Button>();
-            button.targetGraphic = circle;
-            var colors = button.colors;
-            colors.disabledColor = Color.white; // locked look comes from the node's own color
-            colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            button.colors = colors;
-
-            var number = UiBuilder.CreateText("Number", circle.transform, "1", 76, Cream, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiBuilder.Stretch(number.rectTransform);
-
-            var lockIcon = UiBuilder.CreateImage("Lock", circle.transform, lockSprite, LockGray);
-            UiBuilder.Place(lockIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(90f, 90f));
-
-            var stars = new Image[3];
-            for (int i = 0; i < stars.Length; i++)
-            {
-                stars[i] = UiBuilder.CreateImage($"Star {i + 1}", root, starSprite, Color.white);
-                float y = i == 1 ? -18f : -6f; // little arc
-                UiBuilder.Place(stars[i].rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 56f, y), new Vector2(52f, 52f));
-            }
-
-            var view = root.gameObject.AddComponent<LevelNodeView>();
-            Wire(view, "button", button);
-            Wire(view, "background", circle);
-            Wire(view, "numberText", number);
-            Wire(view, "lockIcon", lockIcon);
-            WireArray(view, "stars", stars);
-            root.gameObject.SetActive(false);
-            return view;
-        }
-
-        // ---------- Wiring ----------
-
-        /// <summary>Sets a [SerializeField] private field and fails loudly if the field name is wrong or the value is missing.</summary>
-        private static void Wire(Object target, string fieldName, Object value)
-        {
-            if (value == null)
-            {
-                Debug.LogError($"[Flowers] Setup: nothing to assign to {target.GetType().Name}.{fieldName} (the value is null/destroyed).");
-                _wiringFailed = true;
-                return;
-            }
-
-            var property = FindProperty(target, fieldName, out var so);
-            if (property == null) return;
-            property.objectReferenceValue = value;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        private static void WireArray(Object target, string fieldName, Object[] values)
-        {
-            var property = FindProperty(target, fieldName, out var so);
-            if (property == null) return;
-            property.arraySize = values.Length;
-            for (int i = 0; i < values.Length; i++)
-                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        private static SerializedProperty FindProperty(Object target, string fieldName, out SerializedObject so)
-        {
-            so = new SerializedObject(target);
-            var property = so.FindProperty(fieldName);
-            if (property == null)
-            {
-                Debug.LogError($"[Flowers] Setup: {target.GetType().Name} has no serialized field '{fieldName}'.");
-                _wiringFailed = true;
-            }
-            return property;
         }
     }
 }

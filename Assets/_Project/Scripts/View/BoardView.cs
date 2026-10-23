@@ -381,9 +381,16 @@ namespace Flowers.View
             float boardWidth = _width * _cell;
             float boardHeight = _height * _cell;
 
+            var frameSize = new Vector2(boardWidth + config.FramePadding * 2f, boardHeight + config.FramePadding * 2f);
+
+            var shadow = CreateSpriteChild("Shadow", config.FrameSprite, config.BoardShadowColor, -3);
+            shadow.drawMode = SpriteDrawMode.Sliced;
+            shadow.size = frameSize + new Vector2(0.15f, 0.15f);
+            shadow.transform.localPosition = config.BoardShadowOffset;
+
             var frame = CreateSpriteChild("Frame", config.FrameSprite, config.FrameColor, -2);
             frame.drawMode = SpriteDrawMode.Sliced;
-            frame.size = new Vector2(boardWidth + config.FramePadding * 2f, boardHeight + config.FramePadding * 2f);
+            frame.size = frameSize;
 
             var tiles = new GameObject("Tiles").transform;
             tiles.SetParent(_backgroundRoot, false);
@@ -429,14 +436,18 @@ namespace Flowers.View
             float neededHeight = _height * _cell + extra;
             float aspect = Mathf.Max(0.01f, targetCamera.aspect);
 
-            // The top part of the screen is kept free for the HUD; the board is centered in what's left.
+            // The top part of the screen is kept free for the HUD. The board hangs just below it;
+            // any spare height ends up at the bottom, where the garden's flower bushes show.
             float reserved = config.HudReservedTopFraction;
             float size = Mathf.Max(neededHeight * 0.5f / (1f - reserved), neededWidth * 0.5f / aspect);
 
+            var boardPos = transform.position;
+            float boardTop = boardPos.y + _height * _cell * 0.5f + config.FramePadding;
+            float viewTop = boardTop + config.ScreenMargin + size * 2f * reserved;
+
             targetCamera.orthographic = true;
             targetCamera.orthographicSize = size;
-            var boardPos = transform.position;
-            targetCamera.transform.position = new Vector3(boardPos.x, boardPos.y + size * reserved, boardPos.z - 10f);
+            targetCamera.transform.position = new Vector3(boardPos.x, viewTop - size, boardPos.z - 10f);
         }
 
         private bool HasRequiredReferences()

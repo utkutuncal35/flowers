@@ -18,7 +18,7 @@ namespace Flowers.UI
         [SerializeField] private Color openColor = new Color32(0xE8, 0x34, 0x4A, 0xFF);
         [SerializeField] private Color lockedColor = new Color32(0xE6, 0xD3, 0xD0, 0xFF);
         [SerializeField] private Color numberColor = new Color32(0xFF, 0xF7, 0xEE, 0xFF);
-        [SerializeField] private Color starEarnedColor = new Color32(0xC8, 0x1D, 0x3F, 0xFF);
+        [SerializeField] private Color starEarnedColor = new Color32(0xFF, 0x5A, 0x75, 0xFF);
         [SerializeField] private Color starMissedColor = new Color32(0xE6, 0xD3, 0xD0, 0xFF);
 
         [Header("Pulse (current level)")]

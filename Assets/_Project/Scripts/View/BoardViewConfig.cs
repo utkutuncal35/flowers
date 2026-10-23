@@ -26,10 +26,25 @@ namespace Flowers.View
         [SerializeField, Range(0f, 0.4f)] private float hudReservedTopFraction = 0.14f;
 
         [Header("Colors")]
-        [SerializeField] private Color backgroundColor = new Color32(0xFB, 0xF3, 0xEA, 0xFF);
-        [SerializeField] private Color frameColor = new Color32(0x8E, 0x2C, 0x48, 0xFF);
-        [SerializeField] private Color tileColorA = new Color32(0xF5, 0xE1, 0xDD, 0xFF);
-        [SerializeField] private Color tileColorB = new Color32(0xEC, 0xD0, 0xCD, 0xFF);
+        [Tooltip("Camera clear color, only visible if the background picture doesn't cover the screen.")]
+        [SerializeField] private Color backgroundColor = DefaultBackground;
+        [SerializeField] private Color frameColor = DefaultFrame;
+        [SerializeField] private Color tileColorA = DefaultTileA;
+        [SerializeField] private Color tileColorB = DefaultTileB;
+        [Tooltip("Soft shadow under the board so it lifts off the garden background.")]
+        [SerializeField] private Color boardShadowColor = DefaultShadow;
+        [SerializeField] private Vector2 boardShadowOffset = new Vector2(0f, -0.18f);
+
+        // Current look. When these change, bump LookVersion so Setup Scene updates existing config assets once.
+        private const int LookVersion = 2;
+        private static readonly Color DefaultBackground = new Color32(0xFC, 0xE0, 0xDC, 0xFF);
+        private static readonly Color DefaultFrame = new Color32(0x8E, 0x2C, 0x48, 0xF2);
+        private static readonly Color DefaultTileA = new Color32(0xFF, 0xF7, 0xEE, 0xF0);
+        private static readonly Color DefaultTileB = new Color32(0xFB, 0xE3, 0xE8, 0xF0);
+        private static readonly Color DefaultShadow = new Color32(0x4A, 0x0D, 0x22, 0x50);
+
+        // Starts at 0 on purpose: assets saved before this field existed load it as 0 and get upgraded.
+        [SerializeField, HideInInspector] private int lookVersion;
 
         private const float DefaultSwapDuration = 0.25f;
         private const float DefaultInvalidSwapReturnDuration = 0.3f;
@@ -64,6 +79,8 @@ namespace Flowers.View
         public Color FrameColor => frameColor;
         public Color TileColorA => tileColorA;
         public Color TileColorB => tileColorB;
+        public Color BoardShadowColor => boardShadowColor;
+        public Vector2 BoardShadowOffset => boardShadowOffset;
         public float SwapDuration => swapDuration;
         public float InvalidSwapReturnDuration => invalidSwapReturnDuration;
         public float PopDuration => popDuration;
@@ -102,6 +119,22 @@ namespace Flowers.View
         }
 
         /// <summary>Used by the Setup Scene menu to plug in the generated placeholder sprites.</summary>
+        /// <summary>
+        /// Used by Setup Scene: if this asset was made with an older look, switch its colors to the current
+        /// defaults once. Later Inspector edits are kept, because the version then matches.
+        /// </summary>
+        public bool EditorUpgradeLook()
+        {
+            if (lookVersion >= LookVersion) return false;
+            backgroundColor = DefaultBackground;
+            frameColor = DefaultFrame;
+            tileColorA = DefaultTileA;
+            tileColorB = DefaultTileB;
+            boardShadowColor = DefaultShadow;
+            lookVersion = LookVersion;
+            return true;
+        }
+
         public void EditorAssignSprites(Sprite[] flowers, Sprite tile, Sprite frame, Sprite mask)
         {
             flowerSprites = flowers;

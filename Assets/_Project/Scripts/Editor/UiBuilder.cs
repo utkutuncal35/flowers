@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,10 +7,27 @@ namespace Flowers.Editor
     /// <summary>Small helpers so the Setup Scene menu can build uGUI objects in a few readable lines.</summary>
     public static class UiBuilder
     {
-        private static Font _font;
+        /// <summary>M PLUS Rounded 1c ExtraBold (Google Fonts, OFL). Chunky and rounded, with all Turkish letters.</summary>
+        public const string FontPath = "Assets/_Project/Fonts/MPLUSRounded1c-ExtraBold.ttf";
 
-        /// <summary>Unity's built-in font. Temporary: a Google Font (TextMesh Pro) comes with the real UI art.</summary>
-        public static Font DefaultFont => _font != null ? _font : _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        private static Font _font;
+        private static bool _usingGameFont;
+
+        public static Font DefaultFont
+        {
+            get
+            {
+                if (_font != null) return _font;
+                _font = AssetDatabase.LoadAssetAtPath<Font>(FontPath);
+                _usingGameFont = _font != null;
+                if (!_usingGameFont)
+                {
+                    Debug.LogWarning($"[Flowers] Font not found at {FontPath}, using Unity's built-in font.");
+                    _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                }
+                return _font;
+            }
+        }
 
         public static RectTransform CreateRect(string name, Transform parent)
         {
@@ -60,13 +78,44 @@ namespace Flowers.Editor
             label.font = DefaultFont;
             label.text = text;
             label.fontSize = fontSize;
-            label.fontStyle = style;
+            // The game font is already ExtraBold; Unity's fake bold on top would smear the letters together.
+            label.fontStyle = _usingGameFont ? FontStyle.Normal : style;
             label.color = color;
             label.alignment = alignment;
             label.horizontalOverflow = HorizontalWrapMode.Overflow;
             label.verticalOverflow = VerticalWrapMode.Overflow;
             label.raycastTarget = false;
             return label;
+        }
+
+        /// <summary>
+        /// Outline (and optional drop shadow) around text so it reads on busy, colorful backgrounds.
+        /// The usual "game title" look: cream letters with a dark bordo edge.
+        /// </summary>
+        public static Text Stroke(Text text, Color outline, float width, bool dropShadow = true)
+        {
+            // An Outline copies the text to 4 diagonal offsets only (±x, ±y). With a thick width that leaves
+            // notches straight left/right/up/down, which reads as a doubled edge. So: one diagonal outline
+            // plus one horizontal and one vertical = copies in 8 directions, an even edge all around.
+            float diagonal = width * 0.71f;
+            AddOutline(text, outline, new Vector2(diagonal, diagonal));
+            AddOutline(text, outline, new Vector2(width, 0f));
+            AddOutline(text, outline, new Vector2(0f, width));
+            if (dropShadow)
+            {
+                var s = text.gameObject.AddComponent<Shadow>();
+                s.effectColor = new Color(outline.r, outline.g, outline.b, 0.3f);
+                s.effectDistance = new Vector2(0f, -width * 0.9f);
+            }
+            return text;
+        }
+
+        private static void AddOutline(Text text, Color color, Vector2 distance)
+        {
+            var o = text.gameObject.AddComponent<Outline>();
+            o.effectColor = color;
+            o.effectDistance = distance;
+            o.useGraphicAlpha = true;
         }
 
         public static Button CreateButton(string name, Transform parent, Sprite background, Color backgroundColor,
@@ -82,7 +131,11 @@ namespace Flowers.Editor
             button.colors = colors;
 
             var text = CreateText("Label", image.transform, label, fontSize, labelColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-            Stretch(text.rectTransform);
+            // Kenney buttons have a darker "depth" band at the bottom; center the label on the face above it.
+            Stretch(text.rectTransform, bottom: 14f);
+            var shadow = text.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.18f);
+            shadow.effectDistance = new Vector2(0f, -3f);
             return button;
         }
     }

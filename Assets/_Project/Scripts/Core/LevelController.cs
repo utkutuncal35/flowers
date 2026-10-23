@@ -22,10 +22,12 @@ namespace Flowers.Core
         [SerializeField] private LevelEndScreen winScreen;
         [SerializeField] private LevelEndScreen loseScreen;
         [SerializeField] private LevelMapScreen mapScreen;
+        [SerializeField] private TitleScreen titleScreen;
+        [SerializeField] private LevelStartPopup levelStartPopup;
         [SerializeField] private BoardJuice boardJuice;
         [Tooltip("Icon shown in the HUD for score goals.")]
         [SerializeField] private Sprite scoreIcon;
-        [Tooltip("Testing: -1 opens the map. 0, 1, 2... jumps straight into that level (even if it is locked).")]
+        [Tooltip("Testing: -1 opens the title screen. 0, 1, 2... jumps straight into that level (even if it is locked).")]
         [SerializeField, Min(-1)] private int debugStartLevel = -1;
         [Tooltip("Short pause after the last animation before the lose screen opens.")]
         [SerializeField, Min(0f)] private float endScreenDelay = 0.35f;
@@ -59,6 +61,7 @@ namespace Flowers.Core
             loseScreen.NextButton.onClick.AddListener(NextLevel);
             loseScreen.MapButton.onClick.AddListener(ShowMap);
             hud.MapButton.onClick.AddListener(ShowMap);
+            titleScreen.PlayButton.onClick.AddListener(ShowMap);
             _ready = true;
         }
 
@@ -78,34 +81,64 @@ namespace Flowers.Core
             if (debugStartLevel >= 0)
                 StartLevel(Mathf.Min(debugStartLevel, levelList.Count - 1));
             else
-                ShowMap();
+                ShowTitle();
         }
 
         private void Update()
         {
-            // Android's back button arrives as the Escape key: from a level, go back to the map.
+            // Android's back button arrives as the Escape key: popup → map, level → map.
             var keyboard = Keyboard.current;
-            if (_ready && keyboard != null && keyboard.escapeKey.wasPressedThisFrame && !mapScreen.gameObject.activeSelf)
-                ShowMap();
+            if (!_ready || keyboard == null || !keyboard.escapeKey.wasPressedThisFrame) return;
+            if (levelStartPopup.gameObject.activeSelf) levelStartPopup.Hide();
+            else if (!mapScreen.gameObject.activeSelf && !titleScreen.gameObject.activeSelf) ShowMap();
+        }
+
+        public void ShowTitle()
+        {
+            HideAllScreens();
+            titleScreen.Show();
         }
 
         public void ShowMap()
         {
-            StopAllCoroutines();
-            winScreen.Hide();
-            loseScreen.Hide();
-            hud.gameObject.SetActive(false);
-            boardView.InputEnabled = false;
-            _session = null;
-            mapScreen.Show(levelList, _progress, StartLevel);
+            HideAllScreens();
+            mapScreen.Show(levelList, _progress, ShowLevelStart);
+        }
+
+        /// <summary>"Bölüm N" popup with the goals; Start begins the level, close returns to whatever is behind.</summary>
+        public void ShowLevelStart(int index)
+        {
+            var data = levelList.Get(index);
+            if (data == null) return;
+            levelStartPopup.Show(index + 1, data.ToDefinition(), boardView.Config.FlowerSprites, scoreIcon,
+                () => StartLevel(index), levelStartPopup.Hide);
         }
 
         public void RetryLevel() => StartLevel(_levelIndex);
 
         public void NextLevel()
         {
-            if (HasUnlockedNext()) StartLevel(_levelIndex + 1);
-            else ShowMap();
+            if (!HasUnlockedNext())
+            {
+                ShowMap();
+                return;
+            }
+            // Show the next level's goals first, over the map.
+            ShowMap();
+            ShowLevelStart(_levelIndex + 1);
+        }
+
+        private void HideAllScreens()
+        {
+            StopAllCoroutines();
+            winScreen.Hide();
+            loseScreen.Hide();
+            levelStartPopup.Hide();
+            mapScreen.Hide();
+            titleScreen.Hide();
+            hud.gameObject.SetActive(false);
+            boardView.InputEnabled = false;
+            _session = null;
         }
 
         private void StartLevel(int index)
@@ -125,10 +158,7 @@ namespace Flowers.Core
                 return;
             }
 
-            StopAllCoroutines();
-            winScreen.Hide();
-            loseScreen.Hide();
-            mapScreen.Hide();
+            HideAllScreens();
             hud.gameObject.SetActive(true);
 
             _levelIndex = index;
@@ -162,16 +192,40 @@ namespace Flowers.Core
 
             // On a loss "Next" only shows if the next level is already open (e.g. replaying an old level):
             // losing never unlocks anything, but it never takes anything away either.
+            if (won) ShowWinScreen(_session.Stars);
+            else ShowLoseScreen();
+        }
+
+        private void ShowWinScreen(int stars) =>
+            winScreen.Show("Tebrikler!", $"Bölüm {_levelIndex + 1} tamam!", stars, HasUnlockedNext());
+
+        private void ShowLoseScreen()
+        {
+            FeedbackPlayer.Play(SoundId.Lose);
+            loseScreen.Show("Hamleler bitti", "Hiç sorun değil,\nhemen tekrar deneyebilirsin.", 0, HasUnlockedNext());
+        }
+
+#if UNITY_EDITOR
+        // Used by Flowers → Capture Screens to visit every screen without playing.
+        public void DebugStartLevel(int index) => StartLevel(index);
+
+        public void DebugShowEndScreen(bool won, int stars)
+        {
+            StopAllCoroutines();
+            boardView.InputEnabled = false;
+            winScreen.Hide();
+            loseScreen.Hide();
             if (won)
             {
-                winScreen.Show("Tebrikler!", $"Bölüm {_levelIndex + 1} tamam.", _session.Stars, HasUnlockedNext());
+                boardJuice.Celebrate();
+                ShowWinScreen(stars);
             }
             else
             {
-                FeedbackPlayer.Play(SoundId.Lose);
-                loseScreen.Show("Hamleler bitti", "Hiç sorun değil,\nhemen tekrar deneyebilirsin.", 0, HasUnlockedNext());
+                ShowLoseScreen();
             }
         }
+#endif
 
         private bool HasUnlockedNext() =>
             _levelIndex + 1 < levelList.Count && _progress.IsUnlocked(_levelIds, _levelIndex + 1);
@@ -185,6 +239,8 @@ namespace Flowers.Core
             if (winScreen == null || !winScreen.HasReferences) return "Win Screen (or one of its parts) is not assigned";
             if (loseScreen == null || !loseScreen.HasReferences) return "Lose Screen (or one of its parts) is not assigned";
             if (mapScreen == null || !mapScreen.HasReferences) return "Map Screen (or one of its parts) is not assigned";
+            if (titleScreen == null || !titleScreen.HasReferences) return "Title Screen (or its Play button) is not assigned";
+            if (levelStartPopup == null || !levelStartPopup.HasReferences) return "Level Start Popup (or one of its parts) is not assigned";
             if (boardJuice == null) return "Board Juice is not assigned";
             if (scoreIcon == null) return "Score Icon is not assigned";
             return null;

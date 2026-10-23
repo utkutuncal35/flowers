@@ -110,3 +110,6 @@ InitTestScene*.unity*
 
 # Project-specific
 .vscode/
+
+# Screenshots from Flowers -> Capture Screens
+/Screenshots/

@@ -19,7 +19,7 @@ namespace Flowers.UI
         [SerializeField] private Button retryButton;
         [SerializeField] private Button nextButton;
         [SerializeField] private Button mapButton;
-        [SerializeField] private Color starEarnedColor = new Color32(0xC8, 0x1D, 0x3F, 0xFF);
+        [SerializeField] private Color starEarnedColor = new Color32(0xFF, 0x5A, 0x75, 0xFF);
         [SerializeField] private Color starMissedColor = new Color32(0xE6, 0xD3, 0xD0, 0xFF);
         [SerializeField, Min(0.01f)] private float starPopDuration = 0.3f;
         [SerializeField, Min(0f)] private float starDelay = 0.2f;
