@@ -24,6 +24,8 @@ namespace Flowers.Editor
             public Sprite Mask;
             public Sprite Star;
             public Sprite Check;
+            public Sprite Circle;
+            public Sprite Lock;
         }
 
         public static Result GenerateAll()
@@ -42,6 +44,8 @@ namespace Flowers.Editor
             result.Mask = WriteSprite($"{Folder}/Mask.png", PlaceholderShapes.RenderSolidSquare(MaskSize), MaskSize, 0);
             result.Star = WriteSprite($"{Folder}/Star.png", PlaceholderShapes.RenderStar(IconSize), IconSize, 0);
             result.Check = WriteSprite($"{Folder}/Check.png", PlaceholderShapes.RenderCheck(IconSize), IconSize, 0);
+            result.Circle = WriteSprite($"{Folder}/Circle.png", PlaceholderShapes.RenderCircle(IconSize), IconSize, 0);
+            result.Lock = WriteSprite($"{Folder}/Lock.png", PlaceholderShapes.RenderLock(IconSize), IconSize, 0);
             return result;
         }
 

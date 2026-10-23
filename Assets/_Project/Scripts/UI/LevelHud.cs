@@ -13,13 +13,17 @@ namespace Flowers.UI
         [SerializeField] private RectTransform goalsContainer;
         [Tooltip("Inactive template; one copy is made per goal.")]
         [SerializeField] private GoalItemView goalTemplate;
+        [SerializeField] private Button mapButton;
 
         private readonly List<GoalItemView> _items = new List<GoalItemView>();
         private Sprite[] _flowerSprites;
         private Sprite _scoreIcon;
 
         public bool HasReferences =>
-            levelText != null && movesText != null && goalsContainer != null && goalTemplate != null && goalTemplate.HasReferences;
+            levelText != null && movesText != null && goalsContainer != null && goalTemplate != null &&
+            goalTemplate.HasReferences && mapButton != null;
+
+        public Button MapButton => mapButton;
 
         public void Setup(int levelNumber, LevelSession session, Sprite[] flowerSprites, Sprite scoreIcon)
         {

@@ -116,6 +116,22 @@ namespace Flowers.Editor
                 DistanceToSegment(u, v, -0.62f, 0.02f, -0.18f, -0.45f) < 0.15f ||
                 DistanceToSegment(u, v, -0.18f, -0.45f, 0.68f, 0.55f) < 0.15f);
 
+        /// <summary>White circle: map nodes and the dotted path.</summary>
+        public static byte[] RenderCircle(int size) =>
+            RenderWhite(size, (u, v) => u * u + v * v < 0.96f * 0.96f);
+
+        /// <summary>White padlock (tinted in the UI).</summary>
+        public static byte[] RenderLock(int size) =>
+            RenderWhite(size, (u, v) =>
+            {
+                bool body = InsideRoundedSquare(u / 0.62f, (v + 0.32f) / 0.5f, 1f, 0.25f);
+                float dy = v - 0.15f;
+                float r = (float)Math.Sqrt(u * u + dy * dy);
+                bool shackle = dy >= 0f && r > 0.26f && r < 0.42f;
+                bool legs = dy < 0f && v > -0.1f && Math.Abs(u) > 0.26f && Math.Abs(u) < 0.42f;
+                return body || shackle || legs;
+            });
+
         private static byte[] RenderWhite(int size, Func<float, float, bool> inside)
         {
             var pixels = new byte[size * size * 4];

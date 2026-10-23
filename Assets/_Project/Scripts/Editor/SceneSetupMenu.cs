@@ -33,6 +33,8 @@ namespace Flowers.Editor
         private static readonly Color LightPink = new Color32(0xF7, 0xA9, 0xC3, 0xFF);
         private static readonly Color LeafGreen = new Color32(0x5E, 0x8C, 0x4A, 0xFF);
         private static readonly Color Dim = new Color(0.2f, 0.03f, 0.08f, 0.55f);
+        private static readonly Color StarRed = new Color32(0xC8, 0x1D, 0x3F, 0xFF);
+        private static readonly Color LockGray = new Color32(0xB9, 0xA3, 0xA0, 0xFF);
 
         private static bool _wiringFailed;
 
@@ -150,6 +152,8 @@ namespace Flowers.Editor
             var panelSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Frame.png");
             var starSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Star.png");
             var checkSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Check.png");
+            var circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Circle.png");
+            var lockSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Lock.png");
             if (config == null)
             {
                 Debug.LogError($"[Flowers] Setup: could not load {ConfigPath}.");
@@ -187,6 +191,8 @@ namespace Flowers.Editor
             var hud = CreateHud(canvas, panelSprite, checkSprite);
             var winScreen = CreateEndScreen(canvas, "Win Screen", panelSprite, starSprite, withStars: true);
             var loseScreen = CreateEndScreen(canvas, "Lose Screen", panelSprite, starSprite, withStars: false);
+            // Created last so it draws over everything else on the canvas.
+            var mapScreen = CreateMapScreen(canvas, circleSprite, lockSprite, starSprite);
 
             var game = new GameObject("Game");
             var controller = game.AddComponent<LevelController>();
@@ -195,6 +201,7 @@ namespace Flowers.Editor
             Wire(controller, "hud", hud);
             Wire(controller, "winScreen", winScreen);
             Wire(controller, "loseScreen", loseScreen);
+            Wire(controller, "mapScreen", mapScreen);
             Wire(controller, "scoreIcon", starSprite);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -236,8 +243,11 @@ namespace Flowers.Editor
             root.offsetMin = new Vector2(30f, -270f);
             root.offsetMax = new Vector2(-30f, -30f);
 
+            var mapButton = UiBuilder.CreateButton("Map Button", root, panelSprite, BordoButton, "Harita", Cream, 34);
+            UiBuilder.Place((RectTransform)mapButton.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -16f), new Vector2(170f, 62f));
+
             var levelText = UiBuilder.CreateText("Level", root, "Bölüm 1", 40, Bordo, TextAnchor.MiddleLeft);
-            UiBuilder.Place(levelText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40f, -18f), new Vector2(300f, 50f));
+            UiBuilder.Place(levelText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(214f, -22f), new Vector2(260f, 50f));
 
             var movesLabel = UiBuilder.CreateText("Moves Label", root, "Hamle", 36, Bordo);
             UiBuilder.Place(movesLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, 20f), new Vector2(200f, 50f));
@@ -264,6 +274,7 @@ namespace Flowers.Editor
             Wire(hud, "movesText", movesText);
             Wire(hud, "goalsContainer", goals);
             Wire(hud, "goalTemplate", template);
+            Wire(hud, "mapButton", mapButton);
             return hud;
         }
 
@@ -316,19 +327,117 @@ namespace Flowers.Editor
                 UiBuilder.Place(stars[i].rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 210f, y), new Vector2(size, size));
             }
 
-            var retry = UiBuilder.CreateButton("Retry Button", card.transform, panelSprite, LightPink, "Tekrar", Bordo, 52);
-            UiBuilder.Place((RectTransform)retry.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-195f, 60f), new Vector2(350f, 150f));
-            var next = UiBuilder.CreateButton("Next Button", card.transform, panelSprite, BordoButton, "Sonraki", Cream, 52);
-            UiBuilder.Place((RectTransform)next.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(195f, 60f), new Vector2(350f, 150f));
+            // Harita | Tekrar | Sonraki. "Sonraki" may be hidden (no unlocked next level).
+            var buttonSize = new Vector2(240f, 140f);
+            var map = UiBuilder.CreateButton("Map Button", card.transform, panelSprite, HudBackground, "Harita", Bordo, 44);
+            UiBuilder.Place((RectTransform)map.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-260f, 60f), buttonSize);
+            var retry = UiBuilder.CreateButton("Retry Button", card.transform, panelSprite, LightPink, "Tekrar", Bordo, 44);
+            UiBuilder.Place((RectTransform)retry.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 60f), buttonSize);
+            var next = UiBuilder.CreateButton("Next Button", card.transform, panelSprite, BordoButton, "Sonraki", Cream, 44);
+            UiBuilder.Place((RectTransform)next.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 60f), buttonSize);
 
             var screen = dim.gameObject.AddComponent<LevelEndScreen>();
             Wire(screen, "titleText", title);
             Wire(screen, "messageText", message);
             Wire(screen, "retryButton", retry);
             Wire(screen, "nextButton", next);
+            Wire(screen, "mapButton", map);
             WireArray(screen, "stars", stars);
             dim.gameObject.SetActive(false);
             return screen;
+        }
+
+        private static LevelMapScreen CreateMapScreen(Transform canvas, Sprite circleSprite, Sprite lockSprite, Sprite starSprite)
+        {
+            // Opaque background: covers the board and blocks touches while the map is open.
+            var background = UiBuilder.CreateImage("Map Screen", canvas, null, Cream);
+            background.raycastTarget = true;
+            UiBuilder.Stretch(background.rectTransform);
+            var root = background.rectTransform;
+
+            var title = UiBuilder.CreateText("Title", root, "Çiçek Bahçesi", 76, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiBuilder.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(1000f, 100f));
+
+            var totalStar = UiBuilder.CreateImage("Total Star", root, starSprite, StarRed);
+            UiBuilder.Place(totalStar.rectTransform, new Vector2(0.5f, 1f), new Vector2(1f, 0.5f), new Vector2(-10f, -205f), new Vector2(56f, 56f));
+            var starsText = UiBuilder.CreateText("Total Stars", root, "0 / 0", 44, Bordo, TextAnchor.MiddleLeft);
+            UiBuilder.Place(starsText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 0.5f), new Vector2(10f, -205f), new Vector2(300f, 60f));
+
+            // Scroll area under the title.
+            var scrollRoot = UiBuilder.CreateRect("Scroll", root);
+            UiBuilder.Stretch(scrollRoot, top: 260f);
+            var scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.scrollSensitivity = 30f;
+
+            var viewport = UiBuilder.CreateRect("Viewport", scrollRoot);
+            UiBuilder.Stretch(viewport);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            // An invisible graphic so drags anywhere in the viewport scroll the map.
+            var hitArea = viewport.gameObject.AddComponent<Image>();
+            hitArea.color = new Color(1f, 1f, 1f, 0f);
+
+            var content = UiBuilder.CreateRect("Content", viewport);
+            content.anchorMin = new Vector2(0f, 0f);
+            content.anchorMax = new Vector2(1f, 0f);
+            content.pivot = new Vector2(0.5f, 0f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, 2000f);
+
+            scroll.viewport = viewport;
+            scroll.content = content;
+
+            var node = CreateLevelNode(content, circleSprite, lockSprite, starSprite);
+
+            var map = background.gameObject.AddComponent<LevelMapScreen>();
+            Wire(map, "scrollRect", scroll);
+            Wire(map, "content", content);
+            Wire(map, "nodeTemplate", node);
+            Wire(map, "starsText", starsText);
+            Wire(map, "dotSprite", circleSprite);
+            background.gameObject.SetActive(false);
+            return map;
+        }
+
+        private static LevelNodeView CreateLevelNode(Transform content, Sprite circleSprite, Sprite lockSprite, Sprite starSprite)
+        {
+            var root = UiBuilder.CreateRect("Level Node Template", content);
+            UiBuilder.Place(root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180f, 180f));
+
+            var circle = UiBuilder.CreateImage("Circle", root, circleSprite, Color.white);
+            circle.raycastTarget = true;
+            UiBuilder.Stretch(circle.rectTransform);
+            var button = circle.gameObject.AddComponent<Button>();
+            button.targetGraphic = circle;
+            var colors = button.colors;
+            colors.disabledColor = Color.white; // locked look comes from the node's own color
+            colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+            button.colors = colors;
+
+            var number = UiBuilder.CreateText("Number", circle.transform, "1", 76, Cream, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiBuilder.Stretch(number.rectTransform);
+
+            var lockIcon = UiBuilder.CreateImage("Lock", circle.transform, lockSprite, LockGray);
+            UiBuilder.Place(lockIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(90f, 90f));
+
+            var stars = new Image[3];
+            for (int i = 0; i < stars.Length; i++)
+            {
+                stars[i] = UiBuilder.CreateImage($"Star {i + 1}", root, starSprite, Color.white);
+                float y = i == 1 ? -18f : -6f; // little arc
+                UiBuilder.Place(stars[i].rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 56f, y), new Vector2(52f, 52f));
+            }
+
+            var view = root.gameObject.AddComponent<LevelNodeView>();
+            Wire(view, "button", button);
+            Wire(view, "background", circle);
+            Wire(view, "numberText", number);
+            Wire(view, "lockIcon", lockIcon);
+            WireArray(view, "stars", stars);
+            root.gameObject.SetActive(false);
+            return view;
         }
 
         // ---------- Wiring ----------

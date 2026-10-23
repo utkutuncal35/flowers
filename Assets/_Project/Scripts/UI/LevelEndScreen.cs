@@ -17,6 +17,7 @@ namespace Flowers.UI
         [SerializeField] private Image[] stars;
         [SerializeField] private Button retryButton;
         [SerializeField] private Button nextButton;
+        [SerializeField] private Button mapButton;
         [SerializeField] private Color starEarnedColor = new Color32(0xC8, 0x1D, 0x3F, 0xFF);
         [SerializeField] private Color starMissedColor = new Color32(0xE6, 0xD3, 0xD0, 0xFF);
         [SerializeField, Min(0.01f)] private float starPopDuration = 0.3f;
@@ -24,13 +25,16 @@ namespace Flowers.UI
 
         public Button RetryButton => retryButton;
         public Button NextButton => nextButton;
+        public Button MapButton => mapButton;
 
-        public bool HasReferences => titleText != null && messageText != null && retryButton != null && nextButton != null;
+        public bool HasReferences =>
+            titleText != null && messageText != null && retryButton != null && nextButton != null && mapButton != null;
 
-        public void Show(string title, string message, int earnedStars)
+        public void Show(string title, string message, int earnedStars, bool canGoNext)
         {
             titleText.text = title;
             messageText.text = message;
+            nextButton.gameObject.SetActive(canGoNext);
             gameObject.SetActive(true);
             if (stars != null && stars.Length > 0)
                 StartCoroutine(PlayStars(earnedStars));
