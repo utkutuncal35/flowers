@@ -34,10 +34,10 @@ MonoBehaviour:
   frameColor: {r: 0.5568628, g: 0.17254902, b: 0.28235295, a: 1}
   tileColorA: {r: 0.9607843, g: 0.88235295, b: 0.8666667, a: 1}
   tileColorB: {r: 0.9254902, g: 0.8156863, b: 0.8039216, a: 1}
-  swapDuration: 0.14
-  invalidSwapReturnDuration: 0.2
-  popDuration: 0.18
-  fallBaseDuration: 0.12
-  fallDurationPerCell: 0.045
+  swapDuration: 0.25
+  invalidSwapReturnDuration: 0.3
+  popDuration: 0.25
+  fallBaseDuration: 0.2
+  fallDurationPerCell: 0.06
   shuffleDuration: 0.4
   swipeThresholdCells: 0.35
