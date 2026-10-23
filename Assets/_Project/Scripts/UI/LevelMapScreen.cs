@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Flowers.Core;
 using Flowers.Levels;
 using UnityEngine;
 using UnityEngine.UI;
@@ -72,7 +73,11 @@ namespace Flowers.UI
                 node.Show(i + 1, status, progress.GetStars(_ids[i]), i == current);
 
                 int index = i; // captured by the click handler
-                node.Button.onClick.AddListener(() => onLevelChosen(index));
+                node.Button.onClick.AddListener(() =>
+                {
+                    FeedbackPlayer.Play(SoundId.Click);
+                    onLevelChosen(index);
+                });
                 _spawned.Add(node.gameObject);
             }
 

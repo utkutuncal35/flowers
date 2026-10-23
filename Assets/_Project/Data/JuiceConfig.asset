@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cc0308d301978f41a72a6fabd69a26a, type: 3}
+  m_Name: JuiceConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Flowers.Core.JuiceConfig
+  masterVolume: 0.8
+  sounds:
+  - id: 0
+    clip: {fileID: 8300000, guid: 04b781d4fcdb97148992c150f8d5bc32, type: 3}
+    volume: 0.9
+  - id: 1
+    clip: {fileID: 8300000, guid: 3c2ca01c7aa42c3418779e1d545cf74c, type: 3}
+    volume: 0.5
+  - id: 2
+    clip: {fileID: 8300000, guid: 6938f5327794f5946a9f0ec4ba4d2ed0, type: 3}
+    volume: 0.7
+  - id: 3
+    clip: {fileID: 8300000, guid: 4335992224ef12a44bcd56bc9a81568e, type: 3}
+    volume: 0.5
+  - id: 4
+    clip: {fileID: 8300000, guid: 339f934fa5dc3d34b88054027d7bf38c, type: 3}
+    volume: 0.9
+  - id: 5
+    clip: {fileID: 8300000, guid: 4dc9cfc53cfa45d40ad67c6779cefb02, type: 3}
+    volume: 0.7
+  - id: 6
+    clip: {fileID: 8300000, guid: 549bea9c82d59e24d89a91fdef101faf, type: 3}
+    volume: 0.9
+  - id: 7
+    clip: {fileID: 8300000, guid: 3451f1eddcdc4024cae599a6373a5ae1, type: 3}
+    volume: 0.7
+  comboSemitonesPerStep: 2
+  maxComboPitch: 2
+  vibrationEnabled: 1
+  lightMilliseconds: 18
+  lightAmplitude: 70
+  mediumMilliseconds: 45
+  mediumAmplitude: 150
+  petalColors:
+  - {r: 0.4, g: 0.07058824, b: 0.18039216, a: 1}
+  - {r: 0.9098039, g: 0.20392157, b: 0.2901961, a: 1}
+  - {r: 0.9254902, g: 0.37254903, b: 0.58431375, a: 1}
+  - {r: 1, g: 0.9529412, b: 0.8627451, a: 1}
+  - {r: 0.96862745, g: 0.6627451, b: 0.7647059, a: 1}
+  petalsPerFlower: 6
+  petalSpeed: {x: 2.5, y: 5}
+  petalSize: {x: 0.18, y: 0.32}
+  petalLifetime: {x: 0.5, y: 0.9}
+  confettiCount: 90
+  confettiLifetime: {x: 2.2, y: 3.2}
+  confettiSize: {x: 0.22, y: 0.4}
+  praiseMinChain: 3
+  praiseWords:
+  - "G\xFCzel!"
+  - Harika!
+  - "Muhte\u015Fem!"
+  - "\u0130nan\u0131lmaz!"

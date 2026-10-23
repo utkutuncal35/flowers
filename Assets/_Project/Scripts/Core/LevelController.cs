@@ -22,12 +22,15 @@ namespace Flowers.Core
         [SerializeField] private LevelEndScreen winScreen;
         [SerializeField] private LevelEndScreen loseScreen;
         [SerializeField] private LevelMapScreen mapScreen;
+        [SerializeField] private BoardJuice boardJuice;
         [Tooltip("Icon shown in the HUD for score goals.")]
         [SerializeField] private Sprite scoreIcon;
         [Tooltip("Testing: -1 opens the map. 0, 1, 2... jumps straight into that level (even if it is locked).")]
         [SerializeField, Min(-1)] private int debugStartLevel = -1;
-        [Tooltip("Short pause after the last animation before the win/lose screen opens.")]
+        [Tooltip("Short pause after the last animation before the lose screen opens.")]
         [SerializeField, Min(0f)] private float endScreenDelay = 0.35f;
+        [Tooltip("Pause before the win screen, so the celebration (petal rain + jingle) is seen first.")]
+        [SerializeField, Min(0f)] private float winScreenDelay = 1.1f;
 
         private readonly List<string> _levelIds = new List<string>();
         private LevelProgress _progress;
@@ -147,20 +150,27 @@ namespace Flowers.Core
             {
                 _progress.RecordWin(_levelIds[_levelIndex], _session.Stars);
                 ProgressStore.Save(_progress.ToData());
+                boardJuice.Celebrate();
             }
             StartCoroutine(ShowEndScreen());
         }
 
         private IEnumerator ShowEndScreen()
         {
-            yield return new WaitForSeconds(endScreenDelay);
+            bool won = _session.State == LevelState.Won;
+            yield return new WaitForSeconds(won ? winScreenDelay : endScreenDelay);
 
             // On a loss "Next" only shows if the next level is already open (e.g. replaying an old level):
             // losing never unlocks anything, but it never takes anything away either.
-            if (_session.State == LevelState.Won)
+            if (won)
+            {
                 winScreen.Show("Tebrikler!", $"Bölüm {_levelIndex + 1} tamam.", _session.Stars, HasUnlockedNext());
+            }
             else
+            {
+                FeedbackPlayer.Play(SoundId.Lose);
                 loseScreen.Show("Hamleler bitti", "Hiç sorun değil,\nhemen tekrar deneyebilirsin.", 0, HasUnlockedNext());
+            }
         }
 
         private bool HasUnlockedNext() =>
@@ -175,6 +185,7 @@ namespace Flowers.Core
             if (winScreen == null || !winScreen.HasReferences) return "Win Screen (or one of its parts) is not assigned";
             if (loseScreen == null || !loseScreen.HasReferences) return "Lose Screen (or one of its parts) is not assigned";
             if (mapScreen == null || !mapScreen.HasReferences) return "Map Screen (or one of its parts) is not assigned";
+            if (boardJuice == null) return "Board Juice is not assigned";
             if (scoreIcon == null) return "Score Icon is not assigned";
             return null;
         }

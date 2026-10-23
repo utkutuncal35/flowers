@@ -116,6 +116,10 @@ namespace Flowers.Editor
                 DistanceToSegment(u, v, -0.62f, 0.02f, -0.18f, -0.45f) < 0.15f ||
                 DistanceToSegment(u, v, -0.18f, -0.45f, 0.68f, 0.55f) < 0.15f);
 
+        /// <summary>White single petal (round end, pointed tip) for the particle effects.</summary>
+        public static byte[] RenderPetal(int size) =>
+            RenderWhite(size, (u, v) => Petal(u, v, 0f, -0.15f, 0f, 0.5f, 0.75f, 0.9f));
+
         /// <summary>White circle: map nodes and the dotted path.</summary>
         public static byte[] RenderCircle(int size) =>
             RenderWhite(size, (u, v) => u * u + v * v < 0.96f * 0.96f);

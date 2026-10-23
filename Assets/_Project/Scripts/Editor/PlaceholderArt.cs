@@ -26,6 +26,7 @@ namespace Flowers.Editor
             public Sprite Check;
             public Sprite Circle;
             public Sprite Lock;
+            public Sprite Petal;
         }
 
         public static Result GenerateAll()
@@ -46,6 +47,7 @@ namespace Flowers.Editor
             result.Check = WriteSprite($"{Folder}/Check.png", PlaceholderShapes.RenderCheck(IconSize), IconSize, 0);
             result.Circle = WriteSprite($"{Folder}/Circle.png", PlaceholderShapes.RenderCircle(IconSize), IconSize, 0);
             result.Lock = WriteSprite($"{Folder}/Lock.png", PlaceholderShapes.RenderLock(IconSize), IconSize, 0);
+            result.Petal = WriteSprite($"{Folder}/Petal.png", PlaceholderShapes.RenderPetal(64), 64, 0);
             return result;
         }
 

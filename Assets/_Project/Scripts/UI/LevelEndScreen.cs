@@ -1,4 +1,5 @@
 using System.Collections;
+using Flowers.Core;
 using Flowers.View;
 using UnityEngine;
 using UnityEngine.UI;
@@ -59,6 +60,8 @@ namespace Flowers.UI
             {
                 yield return new WaitForSeconds(starDelay);
                 var star = stars[i].rectTransform;
+                // Earned stars chime, each a major third higher than the last.
+                if (i < earned) FeedbackPlayer.Play(SoundId.Star, Mathf.Pow(2f, i * 4f / 12f));
                 float time = 0f;
                 while (time < starPopDuration)
                 {

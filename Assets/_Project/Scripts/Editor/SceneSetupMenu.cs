@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Flowers.Core;
 using Flowers.Levels;
 using Flowers.UI;
@@ -24,6 +25,9 @@ namespace Flowers.Editor
         private const string FlowerPrefabPath = "Assets/_Project/Prefabs/Flower.prefab";
         private const string LevelsFolder = "Assets/_Project/Data/Levels";
         private const string LevelListPath = "Assets/_Project/Data/LevelList.asset";
+        private const string JuiceConfigPath = "Assets/_Project/Data/JuiceConfig.asset";
+        private const string ParticleMaterialPath = "Assets/_Project/Art/Materials/Petals.mat";
+        private const string UnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
 
         // UI palette (reference resolution 1080x1920)
         private static readonly Color Bordo = new Color32(0x6A, 0x14, 0x30, 0xFF);
@@ -50,6 +54,8 @@ namespace Flowers.Editor
             CreateOrUpdateConfig(art);
             CreateFlowerPrefab(art.Flowers[0]);
             CreateSampleLevelsIfMissing();
+            CreateOrUpdateJuiceConfig(PlaceholderAudio.GenerateAll());
+            CreateOrUpdateParticleMaterial(art.Petal);
             AssetDatabase.SaveAssets();
 
             BuildScene();
@@ -61,6 +67,43 @@ namespace Flowers.Editor
         }
 
         // ---------- Assets ----------
+
+        /// <summary>Creates JuiceConfig once (tuning is kept), and always plugs in the freshly generated clips.</summary>
+        private static void CreateOrUpdateJuiceConfig(Dictionary<SoundId, AudioClip> clips)
+        {
+            var juice = AssetDatabase.LoadAssetAtPath<JuiceConfig>(JuiceConfigPath);
+            if (juice == null)
+            {
+                juice = ScriptableObject.CreateInstance<JuiceConfig>();
+                AssetDatabase.CreateAsset(juice, JuiceConfigPath);
+            }
+
+            foreach (var pair in clips)
+                juice.EditorAssignClip(pair.Key, pair.Value, PlaceholderAudio.DefaultVolume(pair.Key));
+            EditorUtility.SetDirty(juice);
+        }
+
+        private static void CreateOrUpdateParticleMaterial(Sprite petal)
+        {
+            var shader = Shader.Find(UnlitSpriteShader);
+            if (shader == null)
+            {
+                Debug.LogError($"[Flowers] Setup: shader '{UnlitSpriteShader}' not found.");
+                _wiringFailed = true;
+                return;
+            }
+
+            EditorFolders.Ensure("Assets/_Project/Art/Materials");
+            var material = AssetDatabase.LoadAssetAtPath<Material>(ParticleMaterialPath);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, ParticleMaterialPath);
+            }
+            material.shader = shader;
+            material.mainTexture = petal != null ? petal.texture : null;
+            EditorUtility.SetDirty(material);
+        }
 
         private static void CreateOrUpdateConfig(PlaceholderArt.Result art)
         {
@@ -154,6 +197,8 @@ namespace Flowers.Editor
             var checkSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Check.png");
             var circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Circle.png");
             var lockSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{PlaceholderArt.Folder}/Lock.png");
+            var juiceConfig = AssetDatabase.LoadAssetAtPath<JuiceConfig>(JuiceConfigPath);
+            var particleMaterial = AssetDatabase.LoadAssetAtPath<Material>(ParticleMaterialPath);
             if (config == null)
             {
                 Debug.LogError($"[Flowers] Setup: could not load {ConfigPath}.");
@@ -186,9 +231,26 @@ namespace Flowers.Editor
             Wire(swipe, "boardView", boardView);
             Wire(swipe, "targetCamera", camera);
 
+            var feedback = new GameObject("Feedback").AddComponent<FeedbackPlayer>();
+            Wire(feedback, "config", juiceConfig);
+
+            // Petals fly over the flowers (order 10); confetti over everything on the board (order 20).
+            var petals = CreateParticles("Petals", board.transform, particleMaterial, gravity: 6f, endSize: 0.4f, sortingOrder: 10);
+            var confetti = CreateParticles("Confetti", board.transform, particleMaterial, gravity: 0.6f, endSize: 0.8f, sortingOrder: 20);
+
             var canvas = CreateCanvas();
+            canvas.gameObject.AddComponent<ButtonClickSounds>();
             CreateEventSystem();
             var hud = CreateHud(canvas, panelSprite, checkSprite);
+            var praise = CreatePraiseText(canvas);
+
+            var juice = board.AddComponent<BoardJuice>();
+            Wire(juice, "boardView", boardView);
+            Wire(juice, "config", juiceConfig);
+            Wire(juice, "petals", petals);
+            Wire(juice, "confetti", confetti);
+            Wire(juice, "praiseText", praise);
+            Wire(juice, "targetCamera", camera);
             var winScreen = CreateEndScreen(canvas, "Win Screen", panelSprite, starSprite, withStars: true);
             var loseScreen = CreateEndScreen(canvas, "Lose Screen", panelSprite, starSprite, withStars: false);
             // Created last so it draws over everything else on the canvas.
@@ -202,11 +264,82 @@ namespace Flowers.Editor
             Wire(controller, "winScreen", winScreen);
             Wire(controller, "loseScreen", loseScreen);
             Wire(controller, "mapScreen", mapScreen);
+            Wire(controller, "boardJuice", juice);
             Wire(controller, "scoreIcon", starSprite);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             Selection.activeGameObject = game;
+        }
+
+        /// <summary>
+        /// A particle system that only emits from code (BoardJuice calls Emit). It runs all the time with
+        /// emission off, so emitted particles always simulate. Particles fade out and shrink over their life.
+        /// </summary>
+        private static ParticleSystem CreateParticles(string name, Transform parent, Material material,
+            float gravity, float endSize, int sortingOrder)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.duration = 1f;
+            main.startSpeed = 0f;
+            main.startLifetime = 1f;
+            main.maxParticles = 1500;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.gravityModifier = gravity;
+
+            var emission = ps.emission;
+            emission.enabled = false;
+            var shape = ps.shape;
+            shape.enabled = false;
+
+            var fade = new Gradient();
+            fade.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.65f), new GradientAlphaKey(0f, 1f) });
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            colorOverLifetime.color = new ParticleSystem.MinMaxGradient(fade);
+
+            var sizeOverLifetime = ps.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, endSize));
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = material;
+            renderer.sortingOrder = sortingOrder;
+            if (material == null)
+            {
+                Debug.LogError($"[Flowers] Setup: particle material missing for {name}.");
+                _wiringFailed = true;
+            }
+            return ps;
+        }
+
+        private static PraiseText CreatePraiseText(Transform canvas)
+        {
+            var rect = UiBuilder.CreateRect("Praise", canvas);
+            UiBuilder.Place(rect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1000f, 220f));
+            var group = rect.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+
+            var label = UiBuilder.CreateText("Label", rect, "Harika!", 120, Bordo, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiBuilder.Stretch(label.rectTransform);
+            var outline = label.gameObject.AddComponent<Outline>();
+            outline.effectColor = Cream;
+            outline.effectDistance = new Vector2(5f, -5f);
+
+            var praise = rect.gameObject.AddComponent<PraiseText>();
+            Wire(praise, "label", label);
+            Wire(praise, "canvasGroup", group);
+            return praise;
         }
 
         private static Transform CreateCanvas()

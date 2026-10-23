@@ -21,6 +21,15 @@ namespace Flowers.View
         /// <summary>Fired when a swap's animations have fully finished (valid or not).</summary>
         public event Action<SwapResult> SwapFinished;
 
+        /// <summary>The two flowers start sliding.</summary>
+        public event Action SwapStarted;
+
+        /// <summary>An invalid swap starts bouncing back.</summary>
+        public event Action InvalidSwapReturning;
+
+        /// <summary>A cascade step's flowers start popping. int = step index (0 = the swap's own match, 1+ = chain).</summary>
+        public event Action<CascadeStep, int> StepPopping;
+
         private struct MoveAnim
         {
             public Transform Target;
@@ -152,10 +161,12 @@ namespace Flowers.View
             _moves.Clear();
             AddMove(flowerA.transform, posA, posB, config.SwapDuration);
             AddMove(flowerB.transform, posB, posA, config.SwapDuration);
+            SwapStarted?.Invoke();
             yield return PlayMoves(EaseType.InOutQuad);
 
             if (!result.IsValid)
             {
+                InvalidSwapReturning?.Invoke();
                 _moves.Clear();
                 AddMove(flowerA.transform, posB, posA, config.InvalidSwapReturnDuration);
                 AddMove(flowerB.transform, posA, posB, config.InvalidSwapReturnDuration);
@@ -171,7 +182,7 @@ namespace Flowers.View
             _views[b.X, b.Y] = flowerA;
 
             for (int i = 0; i < result.Steps.Count; i++)
-                yield return PlayCascadeStep(result.Steps[i]);
+                yield return PlayCascadeStep(result.Steps[i], i);
 
             if (result.Shuffled)
                 yield return PlayShuffle(result);
@@ -181,7 +192,7 @@ namespace Flowers.View
             SwapFinished?.Invoke(result);
         }
 
-        private IEnumerator PlayCascadeStep(CascadeStep step)
+        private IEnumerator PlayCascadeStep(CascadeStep step, int stepIndex)
         {
             // 1. Pop
             _popping.Clear();
@@ -191,6 +202,7 @@ namespace Flowers.View
                 _popping.Add(_views[p.X, p.Y]);
                 _views[p.X, p.Y] = null;
             }
+            StepPopping?.Invoke(step, stepIndex);
             yield return PlayPops();
 
             // 2. Fall + refill, together
@@ -335,6 +347,8 @@ namespace Flowers.View
             flower.Show(type, config.FlowerSprites[type], config.FlowerScale * _cell);
             return flower;
         }
+
+        public Vector3 CellToWorld(Position p) => transform.TransformPoint(CellToLocal(p.X, p.Y));
 
         private Vector3 CellToLocal(int x, int y) =>
             new Vector3((x - (_width - 1) * 0.5f) * _cell, (y - (_height - 1) * 0.5f) * _cell, 0f);
