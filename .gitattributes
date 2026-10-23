@@ -1,0 +1,84 @@
+# Normalize all text files to LF in the repo and in the working copy.
+# Unity writes its YAML with LF, so this keeps git from rewriting line endings.
+* text=auto eol=lf
+
+# Code
+*.cs        text diff=csharp
+*.shader    text
+*.hlsl      text
+*.cginc     text
+*.compute   text
+*.asmdef    text
+*.asmref    text
+*.json      text
+*.md        text
+*.txt       text
+*.xml       text
+*.uxml      text
+*.uss       text
+
+# Unity YAML (Asset Serialization = Force Text).
+# merge=unityyamlmerge uses Unity's Smart Merge if it is configured in .git/config;
+# otherwise git falls back to its normal text merge.
+*.unity             text merge=unityyamlmerge linguist-language=YAML
+*.prefab            text merge=unityyamlmerge linguist-language=YAML
+*.asset             text merge=unityyamlmerge linguist-language=YAML
+*.mat               text merge=unityyamlmerge linguist-language=YAML
+*.anim              text merge=unityyamlmerge linguist-language=YAML
+*.controller        text merge=unityyamlmerge linguist-language=YAML
+*.overrideController text merge=unityyamlmerge linguist-language=YAML
+*.physicMaterial    text merge=unityyamlmerge linguist-language=YAML
+*.physicsMaterial2D text merge=unityyamlmerge linguist-language=YAML
+*.playable          text merge=unityyamlmerge linguist-language=YAML
+*.mask              text merge=unityyamlmerge linguist-language=YAML
+*.brush             text merge=unityyamlmerge linguist-language=YAML
+*.flare             text merge=unityyamlmerge linguist-language=YAML
+*.fontsettings      text merge=unityyamlmerge linguist-language=YAML
+*.guiskin           text merge=unityyamlmerge linguist-language=YAML
+*.giparams          text merge=unityyamlmerge linguist-language=YAML
+*.renderTexture     text merge=unityyamlmerge linguist-language=YAML
+*.spriteatlas       text merge=unityyamlmerge linguist-language=YAML
+*.spriteatlasv2     text merge=unityyamlmerge linguist-language=YAML
+*.terrainlayer      text merge=unityyamlmerge linguist-language=YAML
+*.mixer             text merge=unityyamlmerge linguist-language=YAML
+*.shadervariants    text merge=unityyamlmerge linguist-language=YAML
+*.preset            text merge=unityyamlmerge linguist-language=YAML
+*.scenetemplate     text merge=unityyamlmerge linguist-language=YAML
+*.inputactions      text
+*.meta              text merge=unityyamlmerge linguist-language=YAML
+
+# Binary files: never touch line endings, never try to diff or merge.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.psd   binary
+*.tga   binary
+*.tif   binary
+*.tiff  binary
+*.exr   binary
+*.hdr   binary
+*.ase   binary
+*.aseprite binary
+*.ttf   binary
+*.otf   binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.aif   binary
+*.aiff  binary
+*.mp4   binary
+*.mov   binary
+*.fbx   binary
+*.blend binary
+*.dll   binary
+*.so    binary
+*.aar   binary
+*.jar   binary
+*.apk   binary
+*.aab   binary
+*.keystore binary
+*.zip   binary
+*.pdf   binary
+*.cubemap binary
+*.unitypackage binary
