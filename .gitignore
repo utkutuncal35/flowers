@@ -117,3 +117,7 @@ InitTestScene*.unity*
 # Level tuner build output
 /Tools/LevelTuner/bin/
 /Tools/LevelTuner/obj/
+
+# Android build leftovers (IL2CPP symbols backup, Burst debug info)
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+*_BurstDebugInformation_DoNotShip/

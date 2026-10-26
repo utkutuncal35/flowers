@@ -22,9 +22,10 @@ namespace Flowers.Editor
             }
 
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            AppIconMenu.MakeAppIcon();
 
             AssetDatabase.SaveAssets();
-            Debug.Log("[Flowers] Project Setup done: platform = Android, default orientation = Portrait.");
+            Debug.Log("[Flowers] Project Setup done: platform = Android, default orientation = Portrait, app icon set.");
         }
     }
 }

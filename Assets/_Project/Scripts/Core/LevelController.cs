@@ -27,7 +27,7 @@ namespace Flowers.Core
         [SerializeField] private BoardJuice boardJuice;
         [Tooltip("Icon shown in the HUD for score goals.")]
         [SerializeField] private Sprite scoreIcon;
-        [Tooltip("Testing: -1 opens the title screen. 0, 1, 2... jumps straight into that level (even if it is locked).")]
+        [Tooltip("Editor testing only (APK builds ignore it): -1 opens the title screen. 0, 1, 2... jumps straight into that level (even if it is locked).")]
         [SerializeField, Min(-1)] private int debugStartLevel = -1;
         [Tooltip("Short pause after the last animation before the lose screen opens.")]
         [SerializeField, Min(0f)] private float endScreenDelay = 0.35f;
@@ -81,10 +81,16 @@ namespace Flowers.Core
         private void Start()
         {
             if (!_ready) return;
+#if UNITY_EDITOR
+            // Editor only: a value left in the scene must never ship in an APK.
             if (debugStartLevel >= 0)
+            {
+                Debug.LogWarning($"[Flowers] Debug Start Level is {debugStartLevel}: jumping straight into level {debugStartLevel + 1}. Set it to -1 for the normal start (builds always ignore it).", this);
                 StartLevel(Mathf.Min(debugStartLevel, levelList.Count - 1));
-            else
-                ShowTitle();
+                return;
+            }
+#endif
+            ShowTitle();
         }
 
         private void Update()

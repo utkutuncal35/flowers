@@ -290,9 +290,9 @@ namespace Flowers.Editor
 
             var goalsBack = UiBuilder.CreateImage("Goals Back", window, s.Panel, SoftPink, sliced: true);
             UiBuilder.Place(goalsBack.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, top - 330f), new Vector2(700f, 230f));
-            var goals = HorizontalRow("Goals", goalsBack.transform, 50f);
+            var goals = HorizontalRow("Goals", goalsBack.transform, 24f);
             UiBuilder.Stretch(goals, 20f, 20f, 20f, 30f);
-            var template = CreateGoalItem(goals, s.Check, 160f, 120f, 50);
+            var template = CreateGoalItem(goals, s.Check, 140f, 120f, 50);
 
             var moves = UiBuilder.CreateText("Moves", window, "15 hamle", 46, Bordo);
             UiBuilder.Place(moves.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, top - 500f), new Vector2(600f, 60f));
@@ -367,12 +367,12 @@ namespace Flowers.Editor
             UiBuilder.Place(title.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 8f), new Vector2(620f, 90f));
 
             var pill = UiBuilder.CreateImage("Stars Pill", barRect, s.Button, SoftPink, sliced: true);
-            UiBuilder.Place(pill.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 4f), new Vector2(270f, 110f));
+            UiBuilder.Place(pill.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 4f), new Vector2(330f, 110f));
             var pillStar = UiBuilder.CreateImage("Star", pill.transform, s.Star, StarRed);
             UiBuilder.Place(pillStar.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(54f, 6f), new Vector2(80f, 80f));
             pillStar.gameObject.AddComponent<UiMotion>().EditorSetup(UiMotion.Kind.Twinkle, 0.15f, 2f);
             var starsText = UiBuilder.CreateText("Total Stars", pill.transform, "0 / 0", 46, Bordo, TextAnchor.MiddleCenter);
-            UiBuilder.Place(starsText.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-20f, 6f), new Vector2(160f, 70f));
+            UiBuilder.Place(starsText.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-20f, 6f), new Vector2(210f, 70f));
 
             // Big Play button at the bottom.
             var play = UiBuilder.CreateButton("Play Button", root, s.Button, BordoButton, "Oyna", Cream, 84);

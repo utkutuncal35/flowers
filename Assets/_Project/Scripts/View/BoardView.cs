@@ -50,7 +50,7 @@ namespace Flowers.View
 
         private BoardEngine _engine;
         private FlowerView[,] _views;
-        private FlowerView[,] _shuffleBuffer;
+        private FlowerView[,] _moveBuffer;
         private SpriteRenderer[,] _tiles;
         private SpriteRenderer[,] _pots;
         private SpriteRenderer[,] _vines;
@@ -120,7 +120,7 @@ namespace Flowers.View
             _height = layout.Height;
             _engine = new BoardEngine(layout, typeCount, new System.Random(seed != 0 ? seed : Environment.TickCount));
             _views = new FlowerView[_width, _height];
-            _shuffleBuffer = new FlowerView[_width, _height];
+            _moveBuffer = new FlowerView[_width, _height];
             _pool.Prewarm(_width * _height + _width * 2);
 
             BuildBackground();
@@ -257,16 +257,17 @@ namespace Flowers.View
             yield return PlayPops();
 
             // 2. Fall (straight or diagonally) + new flowers, together.
+            // All falls move at once (one flower's target can be another's start), so animate them from their
+            // start cells first, then let MoveReplay shift the whole grid in one go.
             _moves.Clear();
             for (int i = 0; i < step.Falls.Count; i++)
             {
                 var fall = step.Falls[i];
                 var flower = _views[fall.From.X, fall.From.Y];
-                _views[fall.From.X, fall.From.Y] = null;
-                _views[fall.To.X, fall.To.Y] = flower;
                 int cells = Mathf.Max(Mathf.Abs(fall.From.Y - fall.To.Y), Mathf.Abs(fall.From.X - fall.To.X));
                 AddFall(flower.transform, CellToLocal(fall.From.X, fall.From.Y), CellToLocal(fall.To.X, fall.To.Y), cells);
             }
+            MoveReplay.Apply(_views, step.Falls, _moveBuffer);
 
             for (int i = 0; i < step.Spawns.Count; i++)
             {
@@ -300,17 +301,15 @@ namespace Flowers.View
                 yield break;
             }
 
-            Array.Copy(_views, _shuffleBuffer, _views.Length);
             _moves.Clear();
             for (int i = 0; i < result.ShuffleMoves.Count; i++)
             {
                 var move = result.ShuffleMoves[i];
                 var flower = _views[move.From.X, move.From.Y];
-                _shuffleBuffer[move.To.X, move.To.Y] = flower;
                 AddMove(flower.transform, CellToLocal(move.From.X, move.From.Y), CellToLocal(move.To.X, move.To.Y),
                     config.ShuffleDuration);
             }
-            Array.Copy(_shuffleBuffer, _views, _views.Length);
+            MoveReplay.Apply(_views, result.ShuffleMoves, _moveBuffer);
             yield return PlayMoves(EaseType.InOutQuad);
         }
 
@@ -442,18 +441,8 @@ namespace Flowers.View
         /// <summary>Returns every flower (on the board or mid-pop) to the pool.</summary>
         private void ReleaseAllFlowers()
         {
-            if (_views != null)
-                for (int x = 0; x < _width; x++)
-                    for (int y = 0; y < _height; y++)
-                        if (_views[x, y] != null)
-                        {
-                            _pool.Release(_views[x, y]);
-                            _views[x, y] = null;
-                        }
-
-            foreach (var flower in _popping)
-                if (flower.gameObject.activeSelf)
-                    _pool.Release(flower);
+            if (_views != null) Array.Clear(_views, 0, _views.Length);
+            _pool.ReleaseAll(); // also catches flowers mid-pop or lost by a bug
             _popping.Clear();
             _obstaclesPopping.Clear();
             _obstaclePopScales.Clear();
@@ -548,6 +537,9 @@ namespace Flowers.View
             var masks = new GameObject("Flower Mask").transform;
             masks.SetParent(_backgroundRoot, false);
             float frameSize = _cell + config.FramePadding * 2f;
+            // Pieces overlap; with a see-through color the overlaps would show as darker seams, so use it opaque.
+            var frameColor = config.FrameColor;
+            frameColor.a = 1f;
 
             for (int x = 0; x < _width; x++)
             {
@@ -555,7 +547,7 @@ namespace Flowers.View
                 {
                     if (grid.IsVoid(new Position(x, y))) continue;
 
-                    var frame = CreateSpriteChild($"Frame {x},{y}", config.FrameSprite, config.FrameColor, -2, frames);
+                    var frame = CreateSpriteChild($"Frame {x},{y}", config.FrameSprite, frameColor, -2, frames);
                     frame.drawMode = SpriteDrawMode.Sliced;
                     frame.size = new Vector2(frameSize, frameSize);
                     frame.transform.localPosition = CellToLocal(x, y);
@@ -625,12 +617,14 @@ namespace Flowers.View
         private void CheckViewMatchesBoard()
         {
             var grid = _engine.Grid;
+            int shown = 0;
             for (int x = 0; x < _width; x++)
             {
                 for (int y = 0; y < _height; y++)
                 {
                     var view = _views[x, y];
                     int expected = grid[x, y];
+                    if (view != null) shown++;
                     if (view == null ? expected == BoardGrid.Empty : view.Type == expected) continue;
 
                     Debug.LogError($"[Flowers] View is out of sync with the board at ({x},{y}). Rebuilding. Board:\n{grid}", this);
@@ -638,15 +632,21 @@ namespace Flowers.View
                     return;
                 }
             }
+
+            // A flower that is out of the pool but in no cell is a leftover drawn on top of the board.
+            if (_pool.ActiveCount != shown)
+            {
+                Debug.LogError($"[Flowers] {_pool.ActiveCount - shown} stray flower(s) on screen. Rebuilding.", this);
+                RebuildAllFlowers();
+            }
         }
 
         private void RebuildAllFlowers()
         {
+            ReleaseAllFlowers();
             for (int x = 0; x < _width; x++)
                 for (int y = 0; y < _height; y++)
                 {
-                    if (_views[x, y] != null) _pool.Release(_views[x, y]);
-                    _views[x, y] = null;
                     if (_engine.Grid[x, y] == BoardGrid.Empty) continue;
                     var flower = SpawnFlower(_engine.Grid[x, y]);
                     flower.transform.localPosition = CellToLocal(x, y);
