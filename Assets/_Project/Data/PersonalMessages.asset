@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74c81a790f37bed46a364d3443cff091, type: 3}
+  m_Name: PersonalMessages
+  m_EditorClassIdentifier: Assembly-CSharp::Flowers.Core.PersonalMessages
+  finalTitle: Tebrikler!
+  finalMessage: "T\xFCm \xE7i\xE7ekleri toplad\u0131n.\nArt\u0131k ger\xE7ek \xE7i\xE7e\u011Fi
+    g\xF6rebilirsin."
+  revealButton: "Ger\xE7ek \xE7i\xE7e\u011Fi g\xF6r"
+  cameraCaption: "\u0130\u015Fte bah\xE7enin\nen g\xFCzel \xE7i\xE7e\u011Fi"
+  noCameraMessage: "Kamera a\xE7\u0131lmad\u0131 ama olsun:\nger\xE7ek \xE7i\xE7ek
+    sensin."

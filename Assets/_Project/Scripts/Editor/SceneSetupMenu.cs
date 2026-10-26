@@ -22,6 +22,7 @@ namespace Flowers.Editor
         private const string ConfigPath = "Assets/_Project/Data/BoardViewConfig.asset";
         private const string FlowerPrefabPath = "Assets/_Project/Prefabs/Flower.prefab";
         private const string JuiceConfigPath = "Assets/_Project/Data/JuiceConfig.asset";
+        private const string MessagesPath = "Assets/_Project/Data/PersonalMessages.asset";
         private const string ParticleMaterialPath = "Assets/_Project/Art/Materials/Petals.mat";
         private const string UnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
 
@@ -39,6 +40,7 @@ namespace Flowers.Editor
             LevelBuilder.Build(overwriteExisting: false); // creates missing catalog levels only
             CreateOrUpdateJuiceConfig(PlaceholderAudio.GenerateAll());
             CreateOrUpdateParticleMaterial(art.Petal);
+            CreateMessagesIfMissing();
             AssetDatabase.SaveAssets();
 
             BuildScene();
@@ -64,6 +66,13 @@ namespace Flowers.Editor
             foreach (var pair in clips)
                 juice.EditorAssignClip(pair.Key, pair.Value, PlaceholderAudio.DefaultVolume(pair.Key));
             EditorUtility.SetDirty(juice);
+        }
+
+        /// <summary>Creates the personal texts once with the default wording. Never overwrites: Utku edits them.</summary>
+        private static void CreateMessagesIfMissing()
+        {
+            if (AssetDatabase.LoadAssetAtPath<PersonalMessages>(MessagesPath) != null) return;
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<PersonalMessages>(), MessagesPath);
         }
 
         private static void CreateOrUpdateParticleMaterial(Sprite petal)
@@ -133,6 +142,7 @@ namespace Flowers.Editor
             var flowerPrefab = prefabObject != null ? prefabObject.GetComponent<FlowerView>() : null;
             var levelList = AssetDatabase.LoadAssetAtPath<LevelList>(LevelBuilder.LevelListPath);
             var juiceConfig = AssetDatabase.LoadAssetAtPath<JuiceConfig>(JuiceConfigPath);
+            var messages = AssetDatabase.LoadAssetAtPath<PersonalMessages>(MessagesPath);
             var particleMaterial = AssetDatabase.LoadAssetAtPath<Material>(ParticleMaterialPath);
             var sprites = LoadUiSprites(config);
             if (config == null)
@@ -204,6 +214,8 @@ namespace Flowers.Editor
             Wire(controller, "levelStartPopup", ui.LevelStart);
             Wire(controller, "boardJuice", juice);
             Wire(controller, "scoreIcon", sprites.Star);
+            Wire(controller, "finalScreen", ui.Final);
+            Wire(controller, "personalMessages", messages);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -234,6 +246,7 @@ namespace Flowers.Editor
                 Garden = Load(GameArt.GardenPath),
                 Meadow = Load(GameArt.MapMeadowPath),
                 SkyCap = Load(GameArt.MapSkyCapPath),
+                Heart = Load(GameArt.HeartPath),
                 Flowers = config != null ? config.FlowerSprites : new Sprite[0],
             };
         }

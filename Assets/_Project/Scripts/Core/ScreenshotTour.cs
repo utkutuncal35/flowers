@@ -73,6 +73,11 @@ namespace Flowers.Core
             yield return new WaitForSecondsRealtime(3f);
             yield return Capture("9_level30_game");
 
+            // The surprise only, the camera is not opened (it would switch on the PC webcam).
+            controller.DebugShowFinalSurprise();
+            yield return new WaitForSecondsRealtime(1.2f);
+            yield return Capture("10_final_surprise");
+
             Debug.Log($"[Flowers] Screenshot tour done: {OutputFolder}");
             EditorApplication.isPlaying = false;
         }

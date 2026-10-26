@@ -25,6 +25,9 @@ namespace Flowers.Core
         [SerializeField] private TitleScreen titleScreen;
         [SerializeField] private LevelStartPopup levelStartPopup;
         [SerializeField] private BoardJuice boardJuice;
+        [Tooltip("Opens instead of the win screen when the last level is won.")]
+        [SerializeField] private FinalSurpriseScreen finalScreen;
+        [SerializeField] private PersonalMessages personalMessages;
         [Tooltip("Icon shown in the HUD for score goals.")]
         [SerializeField] private Sprite scoreIcon;
         [Tooltip("Editor testing only (APK builds ignore it): -1 opens the title screen. 0, 1, 2... jumps straight into that level (even if it is locked).")]
@@ -63,6 +66,7 @@ namespace Flowers.Core
             loseScreen.MapButton.onClick.AddListener(ShowMap);
             hud.MapButton.onClick.AddListener(ShowMap);
             titleScreen.PlayButton.onClick.AddListener(ShowMap);
+            finalScreen.MapButton.onClick.AddListener(ShowMap);
             var config = boardView.Config;
             _icons = new GoalIcons(config.FlowerSprites, scoreIcon, config.PotSprite, config.VineSprite, config.SoilTileSprite);
             _ready = true;
@@ -145,6 +149,7 @@ namespace Flowers.Core
             levelStartPopup.Hide();
             mapScreen.Hide();
             titleScreen.Hide();
+            finalScreen.Hide();
             hud.gameObject.SetActive(false);
             boardView.InputEnabled = false;
             _session = null;
@@ -207,12 +212,20 @@ namespace Flowers.Core
 
             // On a loss "Next" only shows if the next level is already open (e.g. replaying an old level):
             // losing never unlocks anything, but it never takes anything away either.
-            if (won) ShowWinScreen(_session.Stars);
+            if (won && _levelIndex == levelList.Count - 1) ShowFinalSurprise();
+            else if (won) ShowWinScreen(_session.Stars);
             else ShowLoseScreen();
         }
 
         private void ShowWinScreen(int stars) =>
             winScreen.Show("Tebrikler!", $"Bölüm {_levelIndex + 1} tamam!", stars, HasUnlockedNext());
+
+        /// <summary>The last level is won: the surprise replaces the usual win screen (the stars are saved already).</summary>
+        private void ShowFinalSurprise()
+        {
+            hud.gameObject.SetActive(false);
+            finalScreen.Show(personalMessages);
+        }
 
         private void ShowLoseScreen()
         {
@@ -223,6 +236,14 @@ namespace Flowers.Core
 #if UNITY_EDITOR
         // Used by Flowers → Capture Screens to visit every screen without playing.
         public void DebugStartLevel(int index) => StartLevel(index);
+
+        [ContextMenu("Show Final Surprise (Play mode)")]
+        public void DebugShowFinalSurprise()
+        {
+            if (!Application.isPlaying) return;
+            HideAllScreens();
+            ShowFinalSurprise();
+        }
 
         public void DebugShowEndScreen(bool won, int stars)
         {
@@ -258,6 +279,8 @@ namespace Flowers.Core
             if (levelStartPopup == null || !levelStartPopup.HasReferences) return "Level Start Popup (or one of its parts) is not assigned";
             if (boardJuice == null) return "Board Juice is not assigned";
             if (scoreIcon == null) return "Score Icon is not assigned";
+            if (finalScreen == null || !finalScreen.HasReferences) return "Final Surprise Screen (or one of its parts) is not assigned";
+            if (personalMessages == null) return "Personal Messages is not assigned";
             return null;
         }
     }

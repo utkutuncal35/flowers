@@ -7,7 +7,7 @@ namespace Flowers.Editor
 {
     /// <summary>
     /// Draws the app icon (<see cref="AppIconArt"/>) and sets it in Player Settings for Android:
-    /// adaptive (background + foreground layers, Android 8+), round and legacy, plus the default icon.
+    /// adaptive (background + foreground layers, Android 8+) and the default icon (older launchers).
     /// Also run by Flowers → Project Setup. Safe to run again.
     /// </summary>
     public static class AppIconMenu
@@ -22,8 +22,7 @@ namespace Flowers.Editor
             var background = Write("IconBackground", AppIconArt.Background(Size));
             var foreground = Write("IconForeground", AppIconArt.Foreground(Size));
             var legacy = Write("IconLegacy", AppIconArt.Legacy(Size, false));
-            var round = Write("IconRound", AppIconArt.Legacy(Size, true));
-            if (background == null || foreground == null || legacy == null || round == null)
+            if (background == null || foreground == null || legacy == null)
             {
                 Debug.LogError($"[Flowers] Could not load the app icon textures from {Folder}.");
                 return;
@@ -31,12 +30,11 @@ namespace Flowers.Editor
 
             var android = NamedBuildTarget.Android;
             SetAll(android, AndroidPlatformIconKind.Adaptive, background, foreground);
-            SetAll(android, AndroidPlatformIconKind.Round, round);
-            SetAll(android, AndroidPlatformIconKind.Legacy, legacy);
+            // Round/Legacy slots are deprecated in Unity 6; older launchers fall back to the default icon below.
             PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { legacy }, IconKind.Application);
 
             AssetDatabase.SaveAssets();
-            Debug.Log("[Flowers] App icon set (Android adaptive, round, legacy and default). Build a new APK to see it on the phone.");
+            Debug.Log("[Flowers] App icon set (Android adaptive + default). Build a new APK to see it on the phone.");
         }
 
         /// <summary>Puts the same texture(s) into every density slot. Adaptive icons take (background, foreground).</summary>

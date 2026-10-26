@@ -26,6 +26,7 @@ namespace Flowers.Editor
         public const string CirclePath = ShapesFolder + "/Circle.png";
         public const string LockPath = ShapesFolder + "/Lock.png";
         public const string PetalPath = ShapesFolder + "/Petal.png";
+        public const string HeartPath = ShapesFolder + "/Heart.png";
 
         public const string BackgroundsFolder = "Assets/_Project/Art/Backgrounds";
         public const string GardenPath = BackgroundsFolder + "/Garden.png";
@@ -88,6 +89,7 @@ namespace Flowers.Editor
             WriteSquare(CirclePath, PlaceholderShapes.RenderCircle(IconSize), IconSize, 0);
             WriteSquare(LockPath, PlaceholderShapes.RenderLock(IconSize), IconSize, 0);
             result.Petal = WriteSquare(PetalPath, PlaceholderShapes.RenderPetal(64), 64, 0);
+            WriteSprite(HeartPath, PlaceholderShapes.RenderHeart(512), 512, 512, UiPixelsPerUnit, Vector4.zero);
 
             // Backgrounds: drawn at roughly 2/3 of the 1080x1920 screen; soft art scales up fine.
             EditorFolders.Ensure(BackgroundsFolder);

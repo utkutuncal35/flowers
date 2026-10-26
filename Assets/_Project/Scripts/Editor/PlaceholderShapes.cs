@@ -28,6 +28,16 @@ namespace Flowers.Editor
         public static byte[] RenderCircle(int size) =>
             RenderWhite(size, (u, v) => u * u + v * v < 0.96f * 0.96f);
 
+        /// <summary>White heart (lobes up, point down): the final surprise's camera window and its frame.</summary>
+        public static byte[] RenderHeart(int size) =>
+            RenderWhite(size, (u, v) =>
+            {
+                // Classic heart curve (x² + y² - 1)³ - x²y³ <= 0, which spans x ±1.14, y -1..1.23.
+                float x = u * 1.17f, y = v * 1.15f + 0.115f;
+                float a = x * x + y * y - 1f;
+                return a * a * a - x * x * y * y * y <= 0f;
+            });
+
         /// <summary>White padlock (tinted in the UI).</summary>
         public static byte[] RenderLock(int size) =>
             RenderWhite(size, (u, v) =>

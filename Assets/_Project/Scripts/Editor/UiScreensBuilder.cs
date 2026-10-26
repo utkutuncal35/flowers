@@ -32,7 +32,7 @@ namespace Flowers.Editor
         /// <summary>All sprites the UI needs, loaded by Setup Scene after the scene is created.</summary>
         public struct Sprites
         {
-            public Sprite Panel, Button, Round, Star, Check, Circle, Lock, Ribbon, Rays, Marker, Garden, Meadow, SkyCap;
+            public Sprite Panel, Button, Round, Star, Check, Circle, Lock, Ribbon, Rays, Marker, Garden, Meadow, SkyCap, Heart;
             public Sprite[] Flowers;
         }
 
@@ -45,6 +45,7 @@ namespace Flowers.Editor
             public LevelMapScreen Map;
             public LevelStartPopup LevelStart;
             public TitleScreen Title;
+            public FinalSurpriseScreen Final;
         }
 
         public static Result Build(Sprites s)
@@ -64,6 +65,7 @@ namespace Flowers.Editor
             };
             result.LevelStart = CreateLevelStartPopup(canvas, s);
             result.Title = CreateTitleScreen(canvas, s);
+            result.Final = CreateFinalSurprise(canvas, s);
             return result;
         }
 
@@ -487,6 +489,91 @@ namespace Flowers.Editor
             Wire(title, "playButton", play);
             root.gameObject.SetActive(false);
             return title;
+        }
+
+        // ---------- Final surprise ----------
+
+        /// <summary>
+        /// After the last level: bordo screen with turning rays, the message, and a big heart with a closed rose in
+        /// it. "Gerçek çiçeği gör" swaps the rose for the front camera, cropped by the heart.
+        /// </summary>
+        private static FinalSurpriseScreen CreateFinalSurprise(Transform canvas, Sprites s)
+        {
+            var root = UiBuilder.CreateImage("Final Surprise", canvas, null, Bordo);
+            root.raycastTarget = true;
+            UiBuilder.Stretch(root.rectTransform);
+
+            const float heartY = -60f;
+            const float heartSize = 760f;
+            var rays = UiBuilder.CreateImage("Rays", root.transform, s.Rays, new Color(1f, 0.85f, 0.88f, 0.35f));
+            UiBuilder.Place(rays.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, heartY), new Vector2(1900f, 1900f));
+            rays.gameObject.AddComponent<UiMotion>().EditorSetup(UiMotion.Kind.Rotate, 10f, 1f);
+
+            var title = Ribbon(root.transform, s.Ribbon, "Tebrikler!", 720f, 820f);
+            title.transform.parent.gameObject.AddComponent<PopIn>();
+
+            var message = UiBuilder.Stroke(UiBuilder.CreateText("Message", root.transform, "", 56, Cream), BordoDark, 3f, dropShadow: false);
+            message.horizontalOverflow = HorizontalWrapMode.Wrap;
+            UiBuilder.Place(message.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 470f), new Vector2(960f, 190f));
+
+            // Heart: a pink outline, then the heart-shaped window (a Mask) holding the rose and the camera picture.
+            var heart = UiBuilder.CreateRect("Heart", root.transform);
+            UiBuilder.Place(heart, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, heartY), new Vector2(heartSize, heartSize));
+            heart.gameObject.AddComponent<UiMotion>().EditorSetup(UiMotion.Kind.Pulse, 0.025f, 2.2f);
+            var outline = UiBuilder.CreateImage("Outline", heart, s.Heart, Pink);
+            UiBuilder.Stretch(outline.rectTransform);
+
+            var window = UiBuilder.CreateImage("Window", heart, s.Heart, Cream);
+            UiBuilder.Stretch(window.rectTransform, 34f, 34f, 34f, 34f);
+            window.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+
+            var rose = UiBuilder.CreateImage("Closed Flower", window.transform, s.Flowers[0], Color.white);
+            UiBuilder.Place(rose.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(380f, 380f));
+
+            // Square picture, as big as the heart, so a rotated (sideways) camera still covers it.
+            var mirror = UiBuilder.CreateRect("Camera Mirror", window.transform);
+            UiBuilder.Place(mirror, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 20f), new Vector2(heartSize, heartSize));
+            var pictureRect = UiBuilder.CreateRect("Camera", mirror);
+            UiBuilder.Stretch(pictureRect);
+            var picture = pictureRect.gameObject.AddComponent<RawImage>();
+            picture.raycastTarget = false;
+            picture.gameObject.SetActive(false);
+
+            // A few flowers around the heart.
+            var spots = new[]
+            {
+                (type: 2, pos: new Vector2(-390f, 230f), size: 150f, rot: -14f),
+                (type: 4, pos: new Vector2(395f, 250f), size: 140f, rot: 12f),
+                (type: 1, pos: new Vector2(-360f, -330f), size: 130f, rot: 10f),
+                (type: 3, pos: new Vector2(360f, -320f), size: 120f, rot: -18f),
+            };
+            foreach (var spot in spots)
+            {
+                var flower = UiBuilder.CreateImage($"Flower {spot.type}", root.transform, s.Flowers[spot.type], Color.white);
+                UiBuilder.Place(flower.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), spot.pos + new Vector2(0f, heartY), new Vector2(spot.size, spot.size));
+                flower.rectTransform.localRotation = Quaternion.Euler(0f, 0f, spot.rot);
+                flower.gameObject.AddComponent<UiMotion>().EditorSetup(UiMotion.Kind.Bob, 14f, 1.4f + spot.type * 0.25f);
+            }
+
+            var reveal = UiBuilder.CreateButton("Reveal Button", root.transform, s.Button, Pink, "Gerçek çiçeği gör", Bordo, 54);
+            UiBuilder.Place((RectTransform)reveal.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -600f), new Vector2(760f, 180f));
+            reveal.gameObject.AddComponent<UiMotion>().EditorSetup(UiMotion.Kind.Pulse, 0.04f, 3f);
+            var revealLabel = reveal.GetComponentInChildren<Text>();
+
+            var map = UiBuilder.CreateButton("Map Button", root.transform, s.Button, SoftPink, "Harita", Bordo, 44);
+            UiBuilder.Place((RectTransform)map.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -800f), new Vector2(320f, 140f));
+
+            var screen = root.gameObject.AddComponent<FinalSurpriseScreen>();
+            Wire(screen, "titleText", title);
+            Wire(screen, "messageText", message);
+            Wire(screen, "revealButton", reveal);
+            Wire(screen, "revealLabel", revealLabel);
+            Wire(screen, "mapButton", map);
+            Wire(screen, "closedFlower", rose.rectTransform);
+            Wire(screen, "cameraMirror", mirror);
+            Wire(screen, "cameraImage", picture);
+            root.gameObject.SetActive(false);
+            return screen;
         }
 
         // ---------- Helpers ----------

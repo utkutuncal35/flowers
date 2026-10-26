@@ -60,8 +60,8 @@ Bölümü aç → hedefi gör → çiçekleri kaydırıp 3+ eşleştir → hedef
 - Oyunun adı ona özel olabilir.
 - Bazı bölüm sonlarında ona küçük mesajlar.
 - Aranızdaki şakalar veya özel anlar oyuna gizlenebilir.
-- **Son bölüm (30) bitince sürpriz bir ekran / mesaj.**
-- Bu metinler kodda değil, kolayca düzenlenebilen bir veri dosyasında tutulur.
+- **Son bölüm (30) bitince sürpriz ekranı:** "Tüm çiçekleri topladın, artık gerçek çiçeği görebilirsin." Butona basınca ön kamera açılır ve görüntü kalp şeklinde bir çerçevede görünür. Gerçek çiçek odur. Kamera açılamazsa yedek bir mesaj çıkar.
+- Bu metinler kodda değil, kolayca düzenlenebilen bir veri dosyasında tutulur. (`Data/PersonalMessages`, Inspector'dan düzenlenir.)
 
 ## Teknik
 - Unity 6.3 LTS, Universal 2D (URP), Android, dikey 1080x1920.
